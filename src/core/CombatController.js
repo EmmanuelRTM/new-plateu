@@ -131,7 +131,8 @@ export class CombatController {
     this.projectiles.spawn({
       x: p.x, y: p.y + ARROW_SPAWN_HEIGHT, z: p.z,
       dir: aimDirection(cameraYaw, cameraPitch),
-      damage: bowDef.attack,
+      // A fused prop on the bow adds its bonus to every arrow, matching the HUD label.
+      damage: fusedAttack(bowDef, this.inventory.equipped()),
     });
   }
 

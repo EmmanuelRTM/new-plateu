@@ -297,7 +297,7 @@ export const BOW_TIMINGS = { draw: 0.35, release: 0.1, recover: 0.3 }   // secon
 export function createProjectileSystem()
 // → { arrows, count, spawn({ x, y, z, dir, speed?, damage }) → Arrow, step(dt, { heightAt }), hitTest(targets) → ArrowHit[],
 //     removeFinished() → number }
-// Arrow.state: 'flying' → 'stuck' (lands at the terrain height, stays 8 s) or 'done' (after 6 s in the air, or on a hit).
+// Arrow.state: 'flying' → 'stuck' (lands on the terrain or a platform top, stays 8 s) or 'done' (after 6 s in the air, or on a hit).
 export function aimDirection(cameraYaw, cameraPitch)    // → unit Vec3 along the camera look ray
 export function arrowHitbox(arrow)                      // → { x, z, radius, yMin, yMax, damage } while flying, else null
 export function createBowState()                        // → { phase: 'idle'|'draw'|'release'|'recover', t }
@@ -312,8 +312,8 @@ export function createArrowMeshes({ max = 64 } = {})    // → { object: Instanc
 // completes and spends one arrow. Arrows leave the chest (1.3 m) along the camera look direction.
 // Arrows pass through trees, rocks and props. They hit only bosses, through BossManager.applyPlayerHitbox, and an
 // arrow that hits is spent. Arrow hits do not wear the bow.
-// Fused rule: melee damage = fusedAttack(def, item) = base attack + the fuse bonus of the item. Arrows use the bow's
-// base attack only, so a fused bow adds nothing to its arrows.
+// Fused rule: damage = fusedAttack(def, item) = base attack + the fuse bonus of the item, for melee hitboxes and for
+// the arrows a fused bow fires alike (the HUD shows the same total).
 ```
 
 ## Zonai abilities — `src/abilities/`, `src/world/props/`, `src/core/platforms.js`

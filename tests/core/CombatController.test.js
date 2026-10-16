@@ -118,4 +118,14 @@ describe('CombatController', () => {
     for (let i = 0; i < 20 && !hitbox; i++) hitbox = combat.update(input(), player, 0.01);
     expect(hitbox.damage).toBe(5 + 6);
   });
+
+  it('a fused bow adds its bonus to the arrows it fires', async () => {
+    const { fuseItem } = await import('../../src/abilities/fuse.js');
+    combat.update(input({ slotPressed: 3 }), player, 0.016);
+    fuseItem(combat.inventory.equipped(), { kind: 'zonaiWheel' });
+    const env = { cameraYaw: 0, cameraPitch: 0, heightAt: () => -100 };
+    combat.update(input({ attackPressed: true }), player, 0.016, env);
+    for (let i = 0; i < 30; i++) combat.update(input(), player, 0.016, env);
+    expect(combat.projectiles.arrows[0].damage).toBe(5 + 10);
+  });
 });

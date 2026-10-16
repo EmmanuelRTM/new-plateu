@@ -33,7 +33,7 @@ import { boxCollider } from '../physics/colliders.js';
 import { SHRINE_GEOMETRY } from '../world/landmarks/shrineGeometry.js';
 import { AbilityController } from '../abilities/AbilityController.js';
 import { AbilityChip } from '../ui/AbilityChip.js';
-import { createPlatformHeightAt } from './platforms.js';
+import { createPlatformHeightAt, platformTopAt } from './platforms.js';
 import { createStars } from '../environment/Stars.js';
 
 const DAY_LENGTH_SECONDS = 720;
@@ -281,7 +281,7 @@ export class Game {
     const hitbox = this.#combat.update(input, state, dt, {
       cameraYaw: this.#cameraRig.yaw,
       cameraPitch: this.#cameraRig.pitch,
-      heightAt: this.#world.heightField.heightAt,
+      heightAt: this.#surfaceHeightAt,
     });
     this.#updateBosses(hitbox, input.blockHeld, dt);
 
@@ -329,6 +329,14 @@ export class Game {
     this.#collision.syncDynamic('props', result.propColliders.map((pc) => pc.collider));
     this.#abilityChip.update({ ability: this.#abilities.state.selected, message: result.message });
   }
+
+  /**
+   * Height of whatever an arrow can land on at (x, z): the terrain or a platform top above it.
+   * @param {number} x
+   * @param {number} z
+   * @returns {number}
+   */
+  #surfaceHeightAt = (x, z) => Math.max(this.#world.heightField.heightAt(x, z), platformTopAt(x, z, this.#platforms));
 
   /**
    * The shrine corridor roof as a box collider (Ascend target and walkable platform).
