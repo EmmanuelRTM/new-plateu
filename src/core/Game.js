@@ -326,6 +326,7 @@ export class Game {
       state.mode = 'air';
       state.grounded = false;
     }
+    if (result.fused) this.#combat.refreshVisuals();
     this.#collision.syncDynamic('props', result.propColliders.map((pc) => pc.collider));
     this.#abilityChip.update({ ability: this.#abilities.state.selected, message: result.message });
   }

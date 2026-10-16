@@ -9,6 +9,8 @@ import { PROP_KINDS } from '../world/props/props.js';
 
 /** How quickly a held prop closes on its aim point, per second (exponential damping). */
 const HOLD_RATE = 12;
+/** Minimum gap (m) kept between a carried prop's base and the terrain. */
+const HOLD_CLEARANCE = 0.15;
 /** Horizontal look length below which the look counts as straight up or down. */
 const MIN_HORIZONTAL = 1e-6;
 
@@ -76,8 +78,9 @@ export function beginHold(prop, state) {
  *   props: the full prop list, so glued props move with the held one
  * @returns {void}
  * @throws {Error} When the prop is not held.
+ *   `heightAt` (optional terrain sampler) keeps the carried prop above the ground.
  */
-export function updateHeld(prop, player, look, dt, { distance = 3.5, height = 1.2, props = [] } = {}) {
+export function updateHeld(prop, player, look, dt, { distance = 3.5, height = 1.2, props = [], heightAt = null } = {}) {
   if (!prop.held) throw new Error(`updateHeld: prop ${prop.id} is not held`);
   const len = Math.hypot(look.x, look.y, look.z);
   if (len < MIN_HORIZONTAL) return;
@@ -86,8 +89,11 @@ export function updateHeld(prop, player, look, dt, { distance = 3.5, height = 1.
   const uz = look.z / len;
   const aimY = player.position.y + height + uy * distance;
   const targetX = player.position.x + ux * distance;
-  const targetY = aimY - PROP_KINDS[prop.kind].height / 2;
   const targetZ = player.position.z + uz * distance;
+  const halfHeight = PROP_KINDS[prop.kind].height / 2;
+  let targetY = aimY - halfHeight;
+  // Never carry the prop into the ground: keep its base at least HOLD_CLEARANCE above the terrain.
+  if (heightAt) targetY = Math.max(targetY, heightAt(targetX, targetZ) + HOLD_CLEARANCE + halfHeight);
   const alpha = 1 - Math.exp(-HOLD_RATE * dt);
   const p = prop.position;
   p.x += (targetX - p.x) * alpha;

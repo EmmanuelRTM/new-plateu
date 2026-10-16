@@ -151,10 +151,21 @@ export class CombatController {
     return result;
   }
 
-  /** Pushes the equipped weapon/shield into the meshes and the menu. */
+  /**
+   * Re-syncs the weapon, shield and fused-prop meshes and the menu with the inventory. Call after
+   * an external change to the equipped item (for example a Fuse).
+   * @returns {void}
+   */
+  refreshVisuals() {
+    this.#syncVisuals();
+  }
+
+  /** Pushes the equipped weapon/shield (and any fused prop) into the meshes and the menu. */
   #syncVisuals() {
     const def = this.equippedDef();
+    const item = this.inventory.equipped();
     this.weapon.setItem(def && def.type !== 'shield' ? def : null);
+    this.weapon.setFused(def && def.type !== 'shield' && item?.fused ? item.fused.kind : null);
     const shield = this.inventory.equippedShield();
     this.weapon.setShield(shield ? getItem(shield.id) : null);
     if (this.menu.isOpen) this.menu.render(this.inventory);

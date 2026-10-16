@@ -7,7 +7,7 @@ import {
   tryGlue,
   followAttached,
 } from '../../src/abilities/ultrahand.js';
-import { createProp } from '../../src/world/props/props.js';
+import { createProp, PROP_KINDS } from '../../src/world/props/props.js';
 import { createAbilityState } from '../../src/abilities/abilityState.js';
 
 const FORWARD = { x: 0, y: 0, z: -1 };
@@ -227,5 +227,24 @@ describe('followAttached', () => {
     child.attachOffset = { x: 0, y: 0, z: 0 };
     followAttached([child]);
     expect(child.position).toEqual({ x: 1, y: 0, z: 1 });
+  });
+});
+
+describe('updateHeld with a terrain sampler', () => {
+  it('keeps the carried prop above the ground when the player aims down', () => {
+    const prop = createProp({ id: 'c', kind: 'crate', x: 0, y: 5, z: 0 });
+    beginHold(prop, null);
+    const player = { position: { x: 0, y: 5, z: 0 } };
+    const down = { x: 0, y: -0.9, z: 0.44 }; // steep downward look
+    for (let i = 0; i < 200; i++) updateHeld(prop, player, down, 0.05, { heightAt: () => 5 });
+    expect(prop.position.y - PROP_KINDS.crate.height / 2).toBeGreaterThanOrEqual(5.15 - 1e-6);
+  });
+
+  it('without a sampler the old behaviour (can go below) is unchanged', () => {
+    const prop = createProp({ id: 'c', kind: 'crate', x: 0, y: 5, z: 0 });
+    beginHold(prop, null);
+    const player = { position: { x: 0, y: 5, z: 0 } };
+    for (let i = 0; i < 200; i++) updateHeld(prop, player, { x: 0, y: -0.9, z: 0.44 }, 0.05);
+    expect(prop.position.y).toBeLessThan(5);
   });
 });

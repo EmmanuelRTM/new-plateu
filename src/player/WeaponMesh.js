@@ -42,6 +42,7 @@ const FLETCH_HEIGHT = 0.05;
  * @typedef {Object} WeaponMeshHandle
  * @property {THREE.Group} object          hand group (attach to the right-arm pivot)
  * @property {THREE.Group} shieldObject    shield group (attach to the left-arm pivot)
+ * @property {(kind: string|null) => void} setFused  shows the fused prop on the weapon (null removes it)
  * @property {(item: import('../items/itemCatalog.js').ItemDef|null) => void} setItem
  *   shows a melee weapon or bow model, or clears it with null; throws for shields
  * @property {(item: import('../items/itemCatalog.js').ItemDef|null) => void} setShield
@@ -63,14 +64,29 @@ export function createWeaponMesh() {
   shieldObject.name = 'ShieldHand';
   shieldObject.position.set(SHIELD_OFFSET.x, SHIELD_OFFSET.y, SHIELD_OFFSET.z);
 
+  let fusedKind = null;
+  let itemType = null;
+
   return {
     object,
     shieldObject,
     setItem(item) {
       clearGroup(object);
+      itemType = item ? item.type : null;
       if (!item) return;
       if (item.type === 'shield') throw new Error('Use setShield for shields');
       object.add(buildWeapon(item));
+      if (fusedKind) object.add(buildFused(fusedKind, itemType));
+    },
+    setFused(kind) {
+      if (kind !== null && !FUSED_SHAPES[kind]) throw new Error(`setFused: unknown prop kind ${kind}`);
+      fusedKind = kind;
+      const old = object.getObjectByName('fused');
+      if (old) {
+        object.remove(old);
+        disposeMesh(old);
+      }
+      if (kind && itemType) object.add(buildFused(kind, itemType));
     },
     setShield(item) {
       clearGroup(shieldObject);
@@ -336,4 +352,49 @@ function buildShield(item) {
   group.add(rim);
   group.add(part(new THREE.SphereGeometry(0.06, 12, 8), mats.hilt, 0, 0, 0.03));
   return group;
+}
+
+/** Local y (metres, along the hanging weapon) where a fused prop sits, per weapon type. */
+const FUSED_TIP_Y = Object.freeze({ sword: -0.95, claymore: -1.25, spear: -1.75, bow: -0.45 });
+
+/** Geometry and material factories per fusable prop kind (see world/props/props.js PROP_KINDS). */
+const FUSED_SHAPES = Object.freeze({
+  boulder: () => ({ geometry: new THREE.DodecahedronGeometry(0.17, 0), colour: 0x8a8d86, flat: true }),
+  crate: () => ({ geometry: new THREE.BoxGeometry(0.24, 0.24, 0.24), colour: 0x9a6b3a, flat: false }),
+  zonaiWheel: () => ({ geometry: new THREE.TorusGeometry(0.15, 0.045, 8, 18), colour: 0x2f8f85, flat: false, glow: 0x5cf0c8 }),
+});
+
+/**
+ * Builds the fused prop mesh attached to the weapon's business end.
+ * @param {string} kind Prop kind from PROP_KINDS.
+ * @param {string} type Weapon type (decides where along the weapon the prop sits).
+ * @returns {THREE.Mesh}
+ * @throws {Error} For an unknown prop kind.
+ */
+function buildFused(kind, type) {
+  const factory = FUSED_SHAPES[kind];
+  if (!factory) throw new Error(`buildFused: unknown prop kind ${kind}`);
+  const { geometry, colour, flat, glow } = factory();
+  const material = new THREE.MeshStandardMaterial({
+    color: colour,
+    roughness: 0.85,
+    flatShading: flat,
+    emissive: glow ?? 0x000000,
+    emissiveIntensity: glow ? 1.2 : 0,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'fused';
+  mesh.castShadow = true;
+  mesh.position.y = FUSED_TIP_Y[type] ?? -0.9;
+  return mesh;
+}
+
+/**
+ * Frees a mesh's geometry and material.
+ * @param {THREE.Object3D} node
+ * @returns {void}
+ */
+function disposeMesh(node) {
+  if (node.geometry) node.geometry.dispose();
+  if (node.material) node.material.dispose();
 }

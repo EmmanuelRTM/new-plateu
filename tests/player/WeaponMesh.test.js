@@ -217,3 +217,28 @@ describe('createArrowGeometry and createArrowMaterial', () => {
     expect(createArrowMaterial()).toBeInstanceOf(THREE.MeshStandardMaterial);
   });
 });
+
+describe('fused props on the weapon', () => {
+  it('attaches a named fused mesh at the weapon tip, swaps it on setItem and removes it with null', () => {
+    const weapon = createWeaponMesh();
+    weapon.setItem(getItem('traveler-sword'));
+    weapon.setFused('boulder');
+    const fused = weapon.object.getObjectByName('fused');
+    expect(fused).toBeDefined();
+    expect(fused.position.y).toBeLessThan(-0.5);
+    weapon.setItem(getItem('traveler-spear'));
+    const onSpear = weapon.object.getObjectByName('fused');
+    expect(onSpear).toBeDefined();
+    expect(onSpear.position.y).toBeLessThan(fused.position.y);
+    weapon.setFused(null);
+    expect(weapon.object.getObjectByName('fused')).toBeUndefined();
+  });
+
+  it('glows for a zonai wheel and rejects unknown kinds', () => {
+    const weapon = createWeaponMesh();
+    weapon.setItem(getItem('boko-club'));
+    weapon.setFused('zonaiWheel');
+    expect(weapon.object.getObjectByName('fused').material.emissiveIntensity).toBeGreaterThan(0);
+    expect(() => weapon.setFused('dragon')).toThrow(/unknown prop kind/);
+  });
+});

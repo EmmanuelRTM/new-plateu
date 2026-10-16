@@ -128,4 +128,14 @@ describe('CombatController', () => {
     for (let i = 0; i < 30; i++) combat.update(input(), player, 0.016, env);
     expect(combat.projectiles.arrows[0].damage).toBe(5 + 10);
   });
+
+  it('refreshVisuals shows the fused prop on the weapon and switching weapons hides it', async () => {
+    const { fuseItem } = await import('../../src/abilities/fuse.js');
+    fuseItem(combat.inventory.equipped(), { kind: 'crate' });
+    expect(combat.weapon.object.getObjectByName('fused')).toBeUndefined();
+    combat.refreshVisuals();
+    expect(combat.weapon.object.getObjectByName('fused')).toBeDefined();
+    combat.update(input({ slotPressed: 4 }), player, 0.016); // boko club, not fused
+    expect(combat.weapon.object.getObjectByName('fused')).toBeUndefined();
+  });
 });

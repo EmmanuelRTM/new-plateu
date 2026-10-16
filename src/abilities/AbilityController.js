@@ -297,7 +297,9 @@ export class AbilityController {
       }
       if (p.attachedTo === null) stepProp(p, { heightAt: this.#heightAt, gravity: this.#gravity }, dt);
     }
-    if (this.#heldId !== null) updateHeld(this.#requireProp(this.#heldId), player, look, dt, { props });
+    if (this.#heldId !== null) {
+      updateHeld(this.#requireProp(this.#heldId), player, look, dt, { props, heightAt: this.#heightAt });
+    }
     followAttached(props);
     for (const p of props) {
       if (!p.recall) recordHistory(p, this.#time, HISTORY_SECONDS);
