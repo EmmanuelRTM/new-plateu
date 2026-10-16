@@ -9,6 +9,7 @@ import { createAttackState, startAttack, stepAttack, attackHitbox, swingProgress
 import { createWeaponMesh } from '../player/WeaponMesh.js';
 import { createProjectileSystem, createBowState, startDraw, stepBow, drawProgress, aimDirection } from '../combat/projectiles.js';
 import { createArrowMeshes } from '../combat/ArrowMeshes.js';
+import { fusedAttack } from '../abilities/fuse.js';
 import { WeaponSlot } from '../ui/WeaponSlot.js';
 import { WeaponMenu } from '../ui/WeaponMenu.js';
 
@@ -111,7 +112,11 @@ export class CombatController {
       hint: this.hint,
       arrows: this.inventory.arrows,
     });
-    return def && def.type !== 'bow' ? attackHitbox(this.attack, def, playerState.position, playerState.yaw) : null;
+    if (!def || def.type === 'bow') return null;
+    const hitbox = attackHitbox(this.attack, def, playerState.position, playerState.yaw);
+    // A fused prop adds its bonus to the melee damage (see abilities/fuse.js).
+    if (hitbox) hitbox.damage = fusedAttack(def, this.inventory.equipped());
+    return hitbox;
   }
 
   /**

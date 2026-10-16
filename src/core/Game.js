@@ -28,6 +28,12 @@ import { BossBar } from '../ui/BossBar.js';
 import { createPlayerVitals } from './playerVitals.js';
 import { arrowHitbox } from '../combat/projectiles.js';
 import { createHeightWorkerPool } from '../world/partition/HeightWorkerPool.js';
+import { createPrng } from '../world/Prng.js';
+import { boxCollider } from '../physics/colliders.js';
+import { SHRINE_GEOMETRY } from '../world/landmarks/shrineGeometry.js';
+import { AbilityController } from '../abilities/AbilityController.js';
+import { AbilityChip } from '../ui/AbilityChip.js';
+import { createPlatformHeightAt } from './platforms.js';
 import { createStars } from '../environment/Stars.js';
 
 const DAY_LENGTH_SECONDS = 720;
@@ -39,6 +45,10 @@ const DEATH_BANNER_TEXT = '…Open your eyes…';
 const DEATH_BANNER_MS = 3500;
 const PROMPT_TEXT = 'Click to look around · WASD move · Shift sprint · Space jump / hold to glide · M map · Tab weapons';
 const NO_MOUSE = Object.freeze({ mouseDX: 0, mouseDY: 0 });
+/** Thickness (m) of the shrine roof slab used as an Ascend target and walkable platform. */
+const SHRINE_ROOF_THICKNESS = 0.6;
+/** Radius (m) around the player in which colliders are offered to Ascend. */
+const ASCEND_QUERY_RADIUS = 16;
 /** Input with every axis and flag cleared, used while a menu or the map is open. */
 const IDLE_INPUT = Object.freeze({
   moveX: 0, moveZ: 0, sprint: false, jumpHeld: false, jumpPressed: false, interactPressed: false,
@@ -104,6 +114,12 @@ export class Game {
   #vitals;
   /** @type {ReturnType<typeof createHeightWorkerPool>} */
   #heightPool;
+  /** @type {AbilityController} */
+  #abilities;
+  /** @type {AbilityChip} */
+  #abilityChip;
+  /** Box colliders the player can stand on and ascend through: temple walls and the shrine roof. */
+  #platforms;
   /** Shrine description shared by the corridor clamp and exit detection. */
   #shrine;
   #wasInsideShrine = true;
@@ -135,7 +151,14 @@ export class Game {
       onChunkUnloaded: (key) => this.#collision.onChunkUnloaded(key),
       heightPool: this.#heightPool,
     });
-    this.#collision.addStatic('temple', collidersFromGroup(this.#world.temple, { skip: (m) => m.isInstancedMesh }));
+    this.#shrine = {
+      position: WORLD.shrine,
+      exitDirection: WORLD.shrine.exitDirection,
+      groundY: this.#world.heightField.heightAt(WORLD.shrine.x, WORLD.shrine.z),
+    };
+    const templeColliders = collidersFromGroup(this.#world.temple, { skip: (m) => m.isInstancedMesh });
+    this.#collision.addStatic('temple', templeColliders);
+    this.#platforms = [...templeColliders, this.#shrineRoof()];
     this.#sky = createSkyDome();
     this.#scene.add(this.#sky.object);
     this.#stars = createStars({ seed: WORLD.seed });
@@ -143,13 +166,13 @@ export class Game {
     this.#lighting = createLighting(this.#scene);
     this.#cycle = createDayNightCycle({ dayLengthSeconds: DAY_LENGTH_SECONDS, startHour: START_HOUR });
 
-    this.#shrine = {
-      position: WORLD.shrine,
-      exitDirection: WORLD.shrine.exitDirection,
-      groundY: this.#world.heightField.heightAt(WORLD.shrine.x, WORLD.shrine.z),
-    };
     this.#input = new Input(this.#renderer.domElement);
-    this.#player = new Player({ heightField: this.#world.heightField, spawn: this.#world.spawn });
+    const groundHeightAt = createPlatformHeightAt({
+      terrainHeightAt: this.#world.heightField.heightAt,
+      boxes: this.#platforms,
+      feetY: () => this.#player.state.position.y,
+    });
+    this.#player = new Player({ heightField: { heightAt: groundHeightAt }, spawn: this.#world.spawn });
     this.#scene.add(this.#player.object);
     this.#cameraRig = new ThirdPersonCamera(this.#camera, {
       heightAt: (x, z) => this.#world.heightField.heightAt(x, z),
@@ -174,6 +197,14 @@ export class Game {
       menuParent: document.getElementById('overlay'),
     });
     this.#scene.add(this.#combat.arrowObject);
+    this.#abilities = new AbilityController({
+      scene: this.#scene,
+      config: WORLD,
+      heightAt: this.#world.heightField.heightAt,
+      prng: createPrng(WORLD.seed + 7),
+      gravity: WORLD.gravity,
+    });
+    this.#abilityChip = new AbilityChip(this.#hud.root);
     this.#bossBar = new BossBar(this.#hud.root);
     this.#bosses = createBossManager({
       scene: this.#scene,
@@ -243,6 +274,7 @@ export class Game {
 
     this.#player.update(input, this.#cameraRig.yaw, dt);
     this.#collision.resolvePlayer(state, PLAYER.radius);
+    this.#updateAbilities(input, dt);
     clampToCorridor(position, this.#shrine);
     const inside = this.#checkShrineExit(position);
     this.#world.chunks.update(position);
@@ -269,6 +301,46 @@ export class Game {
       hearts: this.#vitals.hearts(),
       prompt: raw.pointerLocked ? '' : PROMPT_TEXT,
       player: { x: position.x, z: position.z, yaw: state.yaw },
+    });
+  }
+
+  /**
+   * Runs the Zonai abilities: props, Ultrahand/Fuse/Recall targets and Ascend, then syncs the prop
+   * colliders and the ability chip. An Ascend in progress overrides the player's position.
+   * @param {import('./Input.js').InputState} input
+   * @param {number} dt
+   * @returns {void}
+   */
+  #updateAbilities(input, dt) {
+    const state = this.#player.state;
+    const result = this.#abilities.update(input, state, { yaw: this.#cameraRig.yaw, pitch: this.#cameraRig.pitch }, dt, {
+      colliders: this.#collision.world.query(state.position.x, state.position.z, ASCEND_QUERY_RADIUS),
+      extraSurfaces: [this.#shrineRoof()],
+      equippedItem: this.#combat.inventory.equipped(),
+    });
+    if (result.ascendPosition) {
+      state.position.x = result.ascendPosition.x;
+      state.position.y = result.ascendPosition.y;
+      state.position.z = result.ascendPosition.z;
+      state.velocity.y = 0;
+      state.mode = 'air';
+      state.grounded = false;
+    }
+    this.#collision.syncDynamic('props', result.propColliders.map((pc) => pc.collider));
+    this.#abilityChip.update({ ability: this.#abilities.state.selected, message: result.message });
+  }
+
+  /**
+   * The shrine corridor roof as a box collider (Ascend target and walkable platform).
+   * @returns {ReturnType<typeof boxCollider>}
+   */
+  #shrineRoof() {
+    const d = WORLD.shrine.exitDirection;
+    const top = this.#shrine.groundY + SHRINE_GEOMETRY.height;
+    return boxCollider({
+      x: WORLD.shrine.x, z: WORLD.shrine.z,
+      halfX: SHRINE_GEOMETRY.halfWidth, halfZ: SHRINE_GEOMETRY.halfLength,
+      yaw: Math.atan2(d.x, d.z), yMin: top, yMax: top + SHRINE_ROOF_THICKNESS,
     });
   }
 
@@ -346,7 +418,8 @@ export class Game {
    * @returns {{ player: Player, cameraRig: ThirdPersonCamera, camera: THREE.PerspectiveCamera,
    *   cycle: ReturnType<typeof createDayNightCycle>, world: ReturnType<typeof buildWorld>, scene: THREE.Scene,
    *   collision: ReturnType<typeof createPlayerCollision>, combat: CombatController, hud: Hud,
-   *   bosses: ReturnType<typeof createBossManager>, vitals: ReturnType<typeof createPlayerVitals> }}
+   *   bosses: ReturnType<typeof createBossManager>, vitals: ReturnType<typeof createPlayerVitals>,
+   *   abilities: AbilityController }}
    */
   get debug() {
     return {
@@ -361,6 +434,7 @@ export class Game {
       hud: this.#hud,
       bosses: this.#bosses,
       vitals: this.#vitals,
+      abilities: this.#abilities,
     };
   }
 

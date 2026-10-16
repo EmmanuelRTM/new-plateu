@@ -109,4 +109,13 @@ describe('CombatController', () => {
     for (let i = 0; i < 200; i++) combat.update(input(), player, 0.05, env);
     expect(combat.projectiles.count).toBe(0);
   });
+
+  it('a fused weapon deals its base attack plus the fuse bonus', async () => {
+    const { fuseItem } = await import('../../src/abilities/fuse.js');
+    fuseItem(combat.inventory.equipped(), { kind: 'boulder' });
+    combat.update(input({ attackPressed: true }), player, 0.01);
+    let hitbox = null;
+    for (let i = 0; i < 20 && !hitbox; i++) hitbox = combat.update(input(), player, 0.01);
+    expect(hitbox.damage).toBe(5 + 6);
+  });
 });
