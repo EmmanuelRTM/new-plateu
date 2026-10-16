@@ -9,12 +9,16 @@ files but must not change exported names/signatures without updating this docume
 3. Outside: the **Great Plateau** — rolling grass hills, trees and rocks, a cliff rim, a lake, and the
    **Temple of Time** ruins on a hill. A location banner "Great Plateau" fades in on exit.
 4. Movement: walk, sprint and glide drain stamina; jump; hold jump while falling to deploy the **paraglider**.
-   Stamina regenerates when idle or walking. Movement is collision-checked against trees, rocks, the temple and bosses.
+   Stamina regenerates when idle or walking. Movement is collision-checked against trees, rocks, the temple,
+   bosses and movable props. The temple walls and the shrine roof are walkable platforms.
 5. Beyond the plateau: a streamed **4096 m world** with lowlands and a meandering river, and a mountain
    ring at its edge. Terrain and vegetation are streamed in chunks; a low-detail far terrain fills the horizon.
 6. **Weapons and inventory** (Tears of the Kingdom style): 9 slots, equip by key or wheel, durability that
-   breaks, melee combos, shields you raise to guard. Bows equip and show a model; no arrow firing exists yet.
-   Zonai abilities are listed in the weapon menu as "coming soon" and are not implemented.
+   breaks, melee combos, shields you raise to guard. **Bows** draw and fire arrows from a quiver (left mouse);
+   arrows fly under gravity, stick in the terrain and damage bosses.
+   **Zonai abilities** (F use, Z next, X cancel): Ultrahand grabs and glues movable props, Fuse feeds a prop into
+   the equipped weapon, Ascend rises through ceilings (the shrine roof included), Recall rewinds a prop. Autobuild is
+   listed in the weapon menu as "coming soon" and is not implemented.
 7. **Three bosses** in flat arenas (Stone Talus, Hinox, Flux Construct I) with a phase state machine,
    a health bar. Player death respawns the player at the shrine with full hearts.
 8. **Minimap** (bottom-right) and a full-screen **world map** (M) with landmark and boss markers.
@@ -30,14 +34,25 @@ src/
   core/Input.js                keyboard/mouse → InputState snapshot (Pointer Lock)
   core/WorldBuilder.js         composition of the world (terrain, water, landmarks, chunks)
   core/playerCollision.js      bridge: chunk and static colliders → player push-out
-  core/CombatController.js     inventory, melee attack, weapon meshes, weapon HUD
+  core/CombatController.js     inventory, melee attack, bow and arrows, weapon meshes, weapon HUD
+  core/platforms.js            pure: walkable box tops wrapped around the terrain sampler
   core/playerVitals.js         hearts, damage, guard, invulnerability window, respawn
   core/shrineBounds.js         shrine corridor clamps for player and camera
   physics/                     pure collision: colliders, spatial hash, resolve; meshColliders (Three.js)
-  items/itemCatalog.js         item data (pure)
-  items/Inventory.js           fixed slots, equip, cycle, durability (pure)
+  items/itemCatalog.js         item and Zonai ability data (pure)
+  items/Inventory.js           fixed slots, equip, cycle, durability, arrow quiver (pure)
   combat/Health.js             health resource (pure)
   combat/attackState.js        melee windup/active/recover combo state machine (pure)
+  combat/projectiles.js        arrow flight, stuck arrows, arrow hitboxes, bow draw state machine (pure)
+  combat/ArrowMeshes.js        InstancedMesh adapter that draws live arrows
+  abilities/abilityState.js    Zonai ability selection and status (pure)
+  abilities/ultrahand.js       grab, carry and glue props (pure)
+  abilities/fuse.js            fuse a prop into the equipped weapon (pure)
+  abilities/ascend.js          rise through a ceiling (pure)
+  abilities/recall.js          rewind a prop along its history (pure)
+  abilities/AbilityController.js  owns the props and the abilities; one update() per frame
+  world/props/props.js         movable prop state, physics step, colliders, history, placement (pure)
+  world/props/PropMeshes.js    Three.js adapter for prop meshes and the target highlight
   enemies/bossCatalog.js       boss stat blocks (pure)
   enemies/bossAi.js            boss state machine (pure)
   enemies/Boss.js              one boss: state machine + figure
@@ -78,14 +93,15 @@ src/
   player/PlayerPhysics.js      pure movement/state machine step
   player/playerMovement.js     pure helpers: movement intent, damping, slopes, facing
   player/PlayerMesh.js         placeholder Link (capsule + limbs, arm pivots) Object3D
-  player/WeaponMesh.js         held weapon and shield meshes on the arm pivots
+  player/WeaponMesh.js         held weapon, bow and shield meshes on the arm pivots; arrow geometry and material
   player/Player.js             adapter: Input + PlayerPhysics + PlayerMesh
   camera/ThirdPersonCamera.js  orbit/follow camera with terrain clamp
   ui/Hud.js                    composes StaminaWheel, Hearts, LocationBanner, prompt, MiniMap, WorldMap
   ui/MiniMap.js                circular minimap (bottom-right)
   ui/WorldMap.js               full-screen world map overlay (M)
-  ui/WeaponSlot.js             top-right weapon card (equipped weapon, durability, shield, key hints)
-  ui/WeaponMenu.js             centred 3×3 weapon menu (Tab)
+  ui/WeaponSlot.js             top-right weapon card (equipped weapon, durability, shield, arrows, key hints)
+  ui/WeaponMenu.js             centred 3×3 weapon menu (Tab) with the Zonai row
+  ui/AbilityChip.js            HUD chip under the hearts: selected Zonai ability, status line, key hints
   ui/BossBar.js                top-centre boss health bar
   ui/StaminaWheel.js | Hearts.js | LocationBanner.js | IntroOverlay.js | dom.js
   ui/map/                      canvas2d, mapMath, mapDraw, terrainPainter, terrainCanvas (map helpers)
@@ -143,7 +159,8 @@ export class Input {
 /** @typedef {{ moveX:number, moveZ:number, sprint:boolean, jumpHeld:boolean, jumpPressed:boolean,
  *   interactPressed:boolean, anyKeyPressed:boolean, mouseDX:number, mouseDY:number, pointerLocked:boolean,
  *   attackPressed:boolean, blockHeld:boolean, menuPressed:boolean, mapPressed:boolean,
- *   cycleDelta:number, slotPressed:number }} InputState */
+ *   cycleDelta:number, slotPressed:number, abilityPressed:boolean, abilityCyclePressed:boolean,
+ *   cancelPressed:boolean }} InputState */
 ```
 Key map (`Input.js`; moveX/moveZ are NOT normalised, PlayerPhysics does it):
 
@@ -158,10 +175,13 @@ Key map (`Input.js`; moveX/moveZ are NOT normalised, PlayerPhysics does it):
 | `M` | `mapPressed` — toggles the world map |
 | `Q` / `R` or mouse wheel | `cycleDelta` −1 / +1 — previous / next weapon (wheel only while locked) |
 | `1`–`9` | `slotPressed` = 1..9 — equip that inventory slot |
-| Left mouse (locked) | `attackPressed` — melee attack |
+| `F` | `abilityPressed` — use the selected Zonai ability |
+| `Z` | `abilityCyclePressed` — select the next Zonai ability |
+| `X` | `cancelPressed` — drop a carried prop, or stop a Recall |
+| Left mouse (locked) | `attackPressed` — melee attack; with a bow equipped, starts a draw and fires an arrow |
 | Right mouse held (locked) | `blockHeld` — guard with the equipped shield |
 
-Game-side: while the weapon menu or the world map is open, movement, look, attack and guard are
+Game-side: while the weapon menu or the world map is open, movement, look, attack, guard and the `F`/`Z`/`X` flags are
 zeroed, but `menuPressed`, `cycleDelta` and `slotPressed` still reach the combat controller.
 
 ## Physics (collision) — `src/physics/` and `src/core/playerCollision.js`
@@ -219,16 +239,19 @@ export function clampCameraToCorridor(position, shrine)  // same for the camera,
 export const ITEM_TYPES = Object.freeze(['sword', 'claymore', 'spear', 'bow', 'shield']);
 export const ITEMS = Object.freeze({ /* keyed by id: { id, name, type, attack, durability, reach, swingSeconds, colour, description } */ });
 export function getItem(id)            // → ItemDef; throws on an unknown id
-export const ZONAI_ABILITIES           // five unimplemented entries for the weapon menu
+export const ZONAI_ABILITIES           // { id, name, key, description, implemented }: ultrahand, fuse, ascend, recall (key F);
+                                       // autobuild (not implemented, "coming soon" in the weapon menu)
 // Ids: master-sword (unbreakable, Infinity durability), traveler-sword, soldier-broadsword,
 // royal-broadsword, zonaite-sword, boko-club; traveler-spear, zonaite-spear; traveler-claymore,
 // royal-claymore; traveler-bow, zonaite-bow; wooden-shield, hylian-shield, zonaite-shield.
 
 // items/Inventory.js (pure)
-export function createInventory({ capacity = 9 } = {})
+export function createInventory({ capacity = 9, arrows = 20, maxArrows = 99 } = {})
 // → { slots, equipIndex, add(itemId) → index|-1, remove(index), equip(index), equipped(), cycle(delta),
-//     useDurability(amount = 1) → { broke }, equippedShield(), serialize() }
+//     useDurability(amount = 1) → { broke }, equippedShield(), arrows, maxArrows,
+//     addArrows(count) → arrows (clamped to maxArrows), useArrow() → boolean, serialize() }
 // The first item added while nothing is equipped is equipped automatically. cycle() skips empty slots and wraps.
+// The quiver is not a slot: arrows are a count. useArrow() spends one and returns false (no change) when empty.
 
 // combat/Health.js (pure)
 export function createHealth({ max })  // → { value, dead, damage(amount) → { dead, applied }, heal(amount), ratio() }
@@ -253,16 +276,116 @@ export const STARTING_ITEMS = Object.freeze(['traveler-sword', 'wooden-shield', 
 export class CombatController {
   constructor({ armPivots, hudRoot, menuParent, startingItems = STARTING_ITEMS })
   get menuOpen()                       // true while the weapon menu is open
+  get arrowObject()                    // InstancedMesh of live arrows; Game adds it to the scene once
   equippedDef()                        // → ItemDef | null
-  update(input, playerState, dt)       // handles slot/cycle/menu keys, attacks, visuals, HUD → hitbox | null
+  update(input, playerState, dt, { cameraYaw = 0, cameraPitch = 0, heightAt = () => -Infinity } = {})
+  // handles slot/cycle/menu keys, melee or bow (draw, shot), steps arrows, visuals, HUD → melee hitbox | null
   onHitLanded()                        // wears the weapon; breaks it at 0 durability ("Your weapon broke!" hint, 3 s)
-  inventory, attack, weapon, slot, menu // public handles (inventory is an Inventory)
+  inventory, attack, bow, projectiles, arrowMeshes, weapon, slot, menu  // public handles
 }
 
 // player/WeaponMesh.js
 export function createWeaponMesh()
 // → { object (right hand group), shieldObject (left hand group), setItem(def|null), setShield(def|null), setSwing(progress, type) }
+// setSwing(progress, 'bow'): at full draw the hand pitches up (BOW_AIM_PITCH) and the nock is pulled back 0.25 m.
+export function createArrowGeometry()   // shaft, cone head and fletching merged into one BufferGeometry; +Z is the tip
+export function createArrowMaterial()   // material shared by the arrow parts (double-sided)
+
+// combat/projectiles.js (pure)
+export const ARROW = { speed: 38, gravity: 14, lifeSeconds: 6, stuckSeconds: 8, radius: 0.15 }
+export const BOW_TIMINGS = { draw: 0.35, release: 0.1, recover: 0.3 }   // seconds per bow phase
+export function createProjectileSystem()
+// → { arrows, count, spawn({ x, y, z, dir, speed?, damage }) → Arrow, step(dt, { heightAt }), hitTest(targets) → ArrowHit[],
+//     removeFinished() → number }
+// Arrow.state: 'flying' → 'stuck' (lands at the terrain height, stays 8 s) or 'done' (after 6 s in the air, or on a hit).
+export function aimDirection(cameraYaw, cameraPitch)    // → unit Vec3 along the camera look ray
+export function arrowHitbox(arrow)                      // → { x, z, radius, yMin, yMax, damage } while flying, else null
+export function createBowState()                        // → { phase: 'idle'|'draw'|'release'|'recover', t }
+export function startDraw(state)                        // → boolean; starts from idle or recover only
+export function stepBow(state, dt)                      // → { fired }: true once, when the draw completes
+export function drawProgress(state)                     // → 0..1 for the weapon mesh
+
+// combat/ArrowMeshes.js (Three.js adapter)
+export function createArrowMeshes({ max = 64 } = {})    // → { object: InstancedMesh (castShadow), sync(arrows) }
+
+// Bow rules: press left mouse to start the draw (needs an arrow in the quiver); the shot fires when the 0.35 s draw
+// completes and spends one arrow. Arrows leave the chest (1.3 m) along the camera look direction.
+// Arrows pass through trees, rocks and props. They hit only bosses, through BossManager.applyPlayerHitbox, and an
+// arrow that hits is spent. Arrow hits do not wear the bow.
+// Fused rule: melee damage = fusedAttack(def, item) = base attack + the fuse bonus of the item. Arrows use the bow's
+// base attack only, so a fused bow adds nothing to its arrows.
 ```
+
+## Zonai abilities — `src/abilities/`, `src/world/props/`, `src/core/platforms.js`
+Four abilities share the **F** key (use the selected ability). **Z** selects the next ability (ignored while an
+action is running) and **X** cancels (drops a carried prop, or stops a Recall). Only the selected ability acts.
+```js
+// abilities/abilityState.js (pure)
+export const ABILITIES = Object.freeze(['ultrahand', 'fuse', 'ascend', 'recall'])   // Z cycles in this order
+export function createAbilityState()             // → { selected: 'ultrahand', active: null, cooldown: 0, message: '' }
+export function cycleAbility(state, delta = 1)   // moves the selection, wrapping; throws on an unknown selection
+export function abilityDescription(id)           // one-sentence description; throws on an unknown id
+
+// abilities/AbilityController.js (adapter: owns the props, their meshes and the ability state)
+export class AbilityController {
+  constructor({ scene, config, heightAt, prng, gravity })  // places props (placeProps) on the terrain, adds their meshes
+  get state()          // AbilityState (read-only for callers)
+  get props()          // live Prop[] (read-only for callers)
+  update(input, player, camera, dt, { colliders, extraSurfaces, equippedItem })  // → AbilityFrameResult
+  dispose()            // removes and frees the prop meshes
+}
+/** input: { abilityPressed, abilityCyclePressed, cancelPressed } (edge flags from InputState); player: { position };
+ *  camera: { yaw, pitch }; colliders: static colliders Ascend may rise through; extraSurfaces: more box colliders
+ *  (the shrine roof); equippedItem: the InventoryItem that Fuse upgrades.
+ *  @typedef {{ message: string, ascendPosition: {x,y,z}|null, fused: boolean,
+ *    propColliders: { id: string, collider: CircleCollider }[] }} AbilityFrameResult */
+```
+`update` contract:
+- Every frame it steps falling props, Recall rewinds, the carried prop, glued groups, position history and the meshes.
+- Press, cycle and cancel are ignored while an Ascend rise is in progress.
+- `ascendPosition` is non-null on rising frames. Game sets the player's position to it, which overrides physics.
+- `propColliders` are synced by Game as the `'props'` collider group every frame.
+- `fused` is true on the frame a prop is consumed into the equipped item. `message` is the one-line chip status.
+
+Props (`world/props/props.js`, pure):
+```js
+export const PROP_KINDS    // boulder (radius 0.8, height 1.4, mass 3, fuseBonus 6), crate (0.6, 1.2, 1, 3),
+                           // zonaiWheel (0.7, 0.5, 2, 10)
+export function createProp({ id, kind, x, y, z })   // a free, resting prop; throws on an unknown kind
+export function stepProp(prop, { heightAt, gravity }, dt)  // gravity, landing bounce, friction; held props are skipped
+export function propCollider(prop)                  // → CircleCollider of the footprint and height
+export function recordHistory(prop, t, maxSeconds = 6)     // keeps recent positions for Recall
+export function placeProps(config, prng)            // → Prop[] at y = 0: boulders and crates in a ring outside the
+                                                    // shrine exit, crates at the Temple of Time, three wheels per arena
+```
+```js
+// world/props/PropMeshes.js (Three.js adapter)
+export function createPropMeshes(props)   // → { object: Group, sync(props, { highlightId }) }; one group per prop
+```
+
+Ability rules (one line each, all on F):
+- **Ultrahand**: grabs the nearest free prop within 8 m in the look cone (0.5 rad) and holds it 3.5 m ahead. F again
+  sets it down and glues it to a prop it touches (0.3 m gap). X drops it without gluing.
+- **Fuse**: consumes the nearest free prop in reach into the equipped weapon: +6, +3 or +10 melee attack by kind, and
+  +25 durability. An item takes one fuse (`canFuse`); fusing needs an equipped item.
+- **Ascend**: when a box collider covers the player, its underside is above the head and its top is at most 14 m above
+  the feet, rises at 6 m/s (the lowest such box) and lands 0.2 m above it. Candidates are the box colliders within 16 m
+  (the temple walls) plus the shrine roof. Circle colliders (trees, rocks, props) are never Ascend targets.
+- **Recall**: rewinds the nearest prop in view that has history, along its last 6 s of positions at 2× speed. The prop is
+  held while it rewinds, and X stops it early.
+
+The shrine roof is a 0.6 m slab on the shrine corridor (`SHRINE_GEOMETRY.height` above the ground). It is an Ascend target
+and a walkable platform.
+
+```js
+// core/platforms.js (pure)
+export const PLATFORM_SNAP = 0.6                 // feet may sit this far below a platform top and still snap up
+export function platformTopAt(x, z, boxes)       // → highest top of a box covering (x, z), or -Infinity
+export function createPlatformHeightAt({ terrainHeightAt, boxes, feetY })  // → (x, z) => ground height
+```
+Game wraps the player's ground sampler with `createPlatformHeightAt`. `boxes` are the temple wall colliders and the
+shrine roof, and `feetY` reads the player's feet height. A platform top becomes the ground only when it is above the
+terrain and the feet are within `PLATFORM_SNAP` of it.
 
 ## Enemies — `src/enemies/`
 ```js
@@ -432,6 +555,10 @@ export function createChunkManager({ scene, config, heightField, onChunkLoaded, 
 ```
 Rules: chunks outside ±size/2 are never requested; adjacent chunks share edge samples exactly (no seams);
 vegetation per chunk uses that chunk's own `heightAt/slopeAt` and PRNG seeded by (world seed, cx, cz).
+Threading: Game passes a default `HeightWorkerPool` (2 workers) to `buildWorld`. Only chunks outside the inner 3×3
+ring are sampled by the pool. The inner ring, cached fields, `sync: true` calls (the spawn fill) and chunks whose
+worker request failed are sampled on the main thread. Vegetation geometries and materials come from one
+`VegetationCache` per ChunkManager, so unloading a chunk frees only its own buffers.
 
 ## Visuals — textures, terrain material, wind
 ```js
@@ -621,22 +748,31 @@ export class Game {
 
 **`Game.update(dt)` order:**
 1. `input.snapshot()`. If `mapPressed`, toggle the world map.
-2. While the weapon menu or the map is open, replace input with an idle snapshot (menu and slot keys still pass through).
+2. While the weapon menu or the map is open, replace input with an idle snapshot (menu, cycle and slot keys still pass through).
 3. `player.update(input, cameraRig.yaw, dt)`, then `collision.resolvePlayer(state, PLAYER.radius)`.
-4. `clampToCorridor(position)`, then the shrine exit check (fires `player:exitedShrine` once).
-5. `world.chunks.update(position)` (streams chunks).
-6. `combat.update(input, state, dt)` → the player's melee hitbox.
-7. `#updateBosses(hitbox, input.blockHeld, dt)`:
+   The player's ground sampler is platform-aware (`core/platforms.js`).
+4. `#updateAbilities(input, dt)`: `abilities.update(input, state, { yaw, pitch }, dt, { colliders, extraSurfaces, equippedItem })`.
+   `colliders` are the collision world's colliders within 16 m of the player, and `extraSurfaces` is the shrine roof.
+   If `ascendPosition` is set, it overrides the player's position (mode `air`). Then `syncDynamic('props', propColliders)`
+   and `abilityChip.update(...)`.
+5. `clampToCorridor(position)`, then the shrine exit check (fires `player:exitedShrine` once).
+6. `world.chunks.update(position)` (streams chunks).
+7. `combat.update(input, state, dt, { cameraYaw, cameraPitch, heightAt })` → the player's melee hitbox. This also steps the
+   bow and the arrows.
+8. `#updateBosses(hitbox, input.blockHeld, dt)`:
    - `bosses.update(position, dt)` → `playerHits`.
    - If there is a hitbox, `bosses.applyPlayerHitbox(hitbox)`. Any landed hit calls `combat.onHitLanded()`.
+   - Each flying arrow: `arrowHitbox(arrow)` through `bosses.applyPlayerHitbox`. A landed hit marks the arrow `done`.
+     No durability is spent.
    - Sync boss body colliders into collision (`syncDynamic('boss:<id>')`).
    - `vitals.update(dt)`, then `vitals.takeHits(playerHits, { guarding })`. Guarding needs a shield equipped.
    - If the player died, emit `player:died`.
    - Feed the BossBar with the active boss.
-8. `cameraRig.update(position, input, dt)`, then `#keepCameraInCorridor` while inside the shrine.
-9. `cycle.update(dt)`, `sky.update(cycle, dt)`, `lighting.update(cycle, position)`, `water.userData.update(dt)`.
-10. Stars follow the camera and `stars.update(cycle)`. Then `tickWind(dt)`.
-11. `hud.update({ staminaRatio, exhausted, hearts, prompt, player: { x, z, yaw } })`.
+9. `cameraRig.update(position, input, dt)`, then `#keepCameraInCorridor` while inside the shrine.
+10. `cycle.update(dt)`, `sky.update(cycle, dt)`, `lighting.update(cycle, position)`, `water.userData.update(dt)`,
+    `terrain.userData.update(position)` (far terrain).
+11. Stars follow the camera and `stars.update(cycle)`. Then `tickWind(dt)`.
+12. `hud.update({ staminaRatio, exhausted, hearts, prompt, player: { x, z, yaw } })`.
 
 `#respawn()` (on `player:died`): sets the player to the spawn point with zero velocity, refills hearts,
 resets the exit flag, and shows the banner "…Open your eyes…" for 3.5 s.

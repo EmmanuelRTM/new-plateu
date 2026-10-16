@@ -17,6 +17,11 @@ Built with vanilla JavaScript (ES modules), [Three.js](https://threejs.org/) and
 - Movement with sprint, jump and a paraglider glide, all drawing on stamina.
 - Weapons and inventory inspired by *Tears of the Kingdom*: nine slots, swords, claymores, spears,
   bows and shields, durability that breaks weapons, three-hit combos, and a guard with shields.
+- Bows with arrows from a quiver: draw with the left mouse button, and arrows fly under gravity, stick in
+  the ground or hit bosses.
+- Zonai abilities on movable boulders, crates and Zonai wheels: Ultrahand to grab and glue, Fuse to add a
+  prop's power to your weapon, Ascend through ceilings, and Recall to rewind a prop.
+- Terrain and vegetation chunks sampled in a Web Worker pool, with the nearby chunks on the main thread.
 - Three bosses (Stone Talus, Hinox, Flux Construct I), each with its own phases and health bar.
 - A circular minimap and a full-screen world map with landmark and boss markers.
 - Day and night with a sun, a moon, stars, a sky dome and fog.
@@ -34,10 +39,14 @@ Built with vanilla JavaScript (ES modules), [Three.js](https://threejs.org/) and
 | Jump            | `Space`                                                 |
 | Glide           | Jump, then hold `Space` while falling (drains stamina)  |
 | Attack          | Left mouse button                                       |
+| Shoot           | Left mouse button with a bow equipped (draws, then fires) |
 | Guard           | Hold right mouse button (raises the shield)             |
 | Weapon menu     | `Tab`                                                   |
 | Select slot     | `1` to `9`                                              |
 | Cycle weapon    | `Q` / `R` or the mouse wheel                            |
+| Use Zonai ability | `F` (grab, fuse, rise or rewind, depending on the ability) |
+| Next Zonai ability | `Z`                                                  |
+| Cancel          | `X` (drops a carried prop, or stops a rewind)           |
 | World map       | `M`                                                     |
 
 ## Getting started
