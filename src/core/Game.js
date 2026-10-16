@@ -27,6 +27,7 @@ import { createBossManager } from '../enemies/BossManager.js';
 import { BossBar } from '../ui/BossBar.js';
 import { createPlayerVitals } from './playerVitals.js';
 import { arrowHitbox } from '../combat/projectiles.js';
+import { createHeightWorkerPool } from '../world/partition/HeightWorkerPool.js';
 import { createStars } from '../environment/Stars.js';
 
 const DAY_LENGTH_SECONDS = 720;
@@ -101,6 +102,8 @@ export class Game {
   #bossBar;
   /** @type {ReturnType<typeof createPlayerVitals>} */
   #vitals;
+  /** @type {ReturnType<typeof createHeightWorkerPool>} */
+  #heightPool;
   /** Shrine description shared by the corridor clamp and exit detection. */
   #shrine;
   #wasInsideShrine = true;
@@ -125,9 +128,12 @@ export class Game {
     this.#camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 6000);
 
     this.#collision = createPlayerCollision();
+    // Chunks beyond the player's neighbours are height-sampled off the main thread.
+    this.#heightPool = createHeightWorkerPool({ config: WORLD });
     this.#world = buildWorld(this.#scene, WORLD, {
       onChunkLoaded: (key, payload) => this.#collision.onChunkLoaded(key, payload),
       onChunkUnloaded: (key) => this.#collision.onChunkUnloaded(key),
+      heightPool: this.#heightPool,
     });
     this.#collision.addStatic('temple', collidersFromGroup(this.#world.temple, { skip: (m) => m.isInstancedMesh }));
     this.#sky = createSkyDome();
@@ -373,6 +379,8 @@ export class Game {
   dispose() {
     this.#loop.stop();
     this.#input.detach();
+    this.#world.chunks.dispose();
+    this.#heightPool.dispose();
     window.removeEventListener('resize', this.#onResize);
     this.#renderer.dispose();
     this.#renderer.domElement.remove();
