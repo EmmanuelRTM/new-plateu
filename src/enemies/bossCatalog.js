@@ -67,7 +67,7 @@ export const BOSSES = Object.freeze({
     staggerSeconds: 0.8,
     damageHearts: 1.5,
     strikeRadius: 3.5,
-    staggerThreshold: 9,
+    staggerThreshold: 14,
     colours: Object.freeze({ body: '#7a9a5a', accent: '#c9b08a', glow: '#ffe066' }),
   }),
   flux: Object.freeze({
@@ -86,7 +86,7 @@ export const BOSSES = Object.freeze({
     staggerSeconds: 1.2,
     damageHearts: 1.0,
     strikeRadius: 4.5,
-    staggerThreshold: 14,
+    staggerThreshold: 9,
     colours: Object.freeze({ body: '#3b3f46', accent: '#5fe39a', glow: '#7dffb0' }),
   }),
 });

@@ -5,7 +5,7 @@ const MIE_COEFFICIENT = 0.003;
 const MIE_DIRECTIONAL_G = 0.75;
 /** Rayleigh strength: 1 at night (dark sky), up to 2.75 in full sun (deep blue). */
 const RAYLEIGH_NIGHT = 1;
-const RAYLEIGH_DAY = 2.75;
+const RAYLEIGH_DAY = 1.8;
 
 /**
  * Wraps the official Three.js Sky addon (atmospheric scattering shader) as a scene dome.

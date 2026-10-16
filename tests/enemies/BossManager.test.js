@@ -78,10 +78,10 @@ describe('createBossManager', () => {
   it('applyPlayerHitbox damages a boss in reach and returns only hits', () => {
     const talus = manager.bosses[0];
     const { x, z } = talus.state.position;
-    const hitbox = { x, z, radius: 1, yMin: heightAt(x, z), yMax: heightAt(x, z) + 2, damage: 20 };
+    const hitbox = { x, z, radius: 1, yMin: heightAt(x, z), yMax: heightAt(x, z) + 2, damage: 10 };
     const hits = manager.applyPlayerHitbox(hitbox);
-    expect(hits).toEqual([{ bossId: 'talus', damage: 20, dead: false, staggered: false }]);
-    expect(talus.state.health.value).toBe(BOSSES.talus.hp - 20);
+    expect(hits).toEqual([{ bossId: 'talus', damage: 10, dead: false, staggered: false }]);
+    expect(talus.state.health.value).toBe(BOSSES.talus.hp - 10);
   });
 
   it('applyPlayerHitbox reports an empty array when nothing is in reach', () => {

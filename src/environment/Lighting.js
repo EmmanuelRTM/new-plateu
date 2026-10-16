@@ -6,7 +6,7 @@ const SHADOW_HALF_EXTENT = 80;
 const SUN_DISTANCE = 200;
 /** Peak directional strengths. Sun 2.2 keeps daylight from washing out with exposure 0.55. */
 const SUN_PEAK_INTENSITY = 2.2;
-const MOON_PEAK_INTENSITY = 0.9;
+const MOON_PEAK_INTENSITY = 1.5;
 /**
  * Hemisphere peak: ambient floor 0.45 gives about 0.97 at midnight, ceiling 0.75 gives about 1.6 at noon.
  */

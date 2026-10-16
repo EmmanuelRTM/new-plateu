@@ -133,13 +133,13 @@ describe('DayNightCycle lighting', () => {
     }
   });
 
-  it('ambientIntensity has a night floor of 0.45 and a day ceiling of 0.75', () => {
+  it('ambientIntensity has a night floor of 0.6 and a day ceiling of 0.75', () => {
     for (let h = 0; h < 24; h += 0.25) {
       const v = at(h).ambientIntensity();
-      expect(v).toBeGreaterThanOrEqual(0.45 - 1e-9);
+      expect(v).toBeGreaterThanOrEqual(0.6 - 1e-9);
       expect(v).toBeLessThanOrEqual(0.75 + 1e-9);
     }
-    expect(at(0).ambientIntensity()).toBeCloseTo(0.45, 6);
+    expect(at(0).ambientIntensity()).toBeCloseTo(0.6, 6);
     expect(at(12).ambientIntensity()).toBeCloseTo(0.75, 6);
   });
 
@@ -174,10 +174,10 @@ describe('DayNightCycle lighting', () => {
     expect(night.r).toBeCloseTo(0.2, 2);
   });
 
-  it('skyTurbidity is a deep-blue 4..6 by day and about 1.5 at night', () => {
-    expect(at(12).skyTurbidity()).toBeGreaterThanOrEqual(4);
-    expect(at(12).skyTurbidity()).toBeLessThanOrEqual(6);
-    expect(at(12).skyTurbidity()).toBeCloseTo(5, 1);
+  it('skyTurbidity is a deep-blue 2..4 by day and about 1.5 at night', () => {
+    expect(at(12).skyTurbidity()).toBeGreaterThanOrEqual(2);
+    expect(at(12).skyTurbidity()).toBeLessThanOrEqual(4);
+    expect(at(12).skyTurbidity()).toBeCloseTo(3, 1);
     expect(at(0).skyTurbidity()).toBeCloseTo(1.5, 1);
     expect(at(12).skyTurbidity()).toBeGreaterThan(at(0).skyTurbidity());
   });

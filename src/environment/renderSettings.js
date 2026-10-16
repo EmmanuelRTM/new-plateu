@@ -14,7 +14,7 @@
  * - outputColorSpace: 'srgb' maps to THREE.SRGBColorSpace (the default for display output).
  */
 export const RENDER = Object.freeze({
-  toneMappingExposure: 0.55,
+  toneMappingExposure: 0.65,
   shadowMapType: 'PCF',
   outputColorSpace: 'srgb',
 });

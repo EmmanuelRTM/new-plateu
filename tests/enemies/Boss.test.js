@@ -52,9 +52,9 @@ describe('Boss', () => {
   });
 
   it('takeHit applies damage and reports the result', () => {
-    const result = boss.takeHit(bodyHitbox(boss, 12));
-    expect(result).toEqual({ hit: true, damage: 12, dead: false, staggered: false });
-    expect(boss.state.health.value).toBe(BOSSES.talus.hp - 12);
+    const result = boss.takeHit(bodyHitbox(boss, 8));
+    expect(result).toEqual({ hit: true, damage: 8, dead: false, staggered: false });
+    expect(boss.state.health.value).toBe(BOSSES.talus.hp - 8);
   });
 
   it('takeHit misses a hitbox far from the body', () => {

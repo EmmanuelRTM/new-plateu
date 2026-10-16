@@ -23,6 +23,9 @@ import { createPlayerCollision } from './playerCollision.js';
 import { collidersFromGroup } from '../physics/meshColliders.js';
 import { CombatController } from './CombatController.js';
 import { tickWind } from '../world/vegetation/windUniforms.js';
+import { createBossManager } from '../enemies/BossManager.js';
+import { BossBar } from '../ui/BossBar.js';
+import { createPlayerVitals } from './playerVitals.js';
 import { createStars } from '../environment/Stars.js';
 
 const DAY_LENGTH_SECONDS = 720;
@@ -30,6 +33,8 @@ const START_HOUR = 8.5;
 const HEARTS = 3;
 const EXIT_BANNER_TEXT = 'Great Plateau';
 const EXIT_BANNER_MS = 4500;
+const DEATH_BANNER_TEXT = '…Open your eyes…';
+const DEATH_BANNER_MS = 3500;
 const PROMPT_TEXT = 'Click to look around · WASD move · Shift sprint · Space jump / hold to glide · M map · Tab weapons';
 const NO_MOUSE = Object.freeze({ mouseDX: 0, mouseDY: 0 });
 /** Input with every axis and flag cleared, used while a menu or the map is open. */
@@ -88,6 +93,12 @@ export class Game {
   #combat;
   /** @type {ReturnType<typeof createStars>} */
   #stars;
+  /** @type {ReturnType<typeof createBossManager>} */
+  #bosses;
+  /** @type {BossBar} */
+  #bossBar;
+  /** @type {ReturnType<typeof createPlayerVitals>} */
+  #vitals;
   /** Shrine description shared by the corridor clamp and exit detection. */
   #shrine;
   #wasInsideShrine = true;
@@ -154,9 +165,17 @@ export class Game {
       hudRoot: this.#hud.root,
       menuParent: document.getElementById('overlay'),
     });
+    this.#bossBar = new BossBar(this.#hud.root);
+    this.#bosses = createBossManager({
+      scene: this.#scene,
+      arenas: WORLD.arenas,
+      heightAt: this.#world.heightField.heightAt,
+    });
+    this.#vitals = createPlayerVitals({ maxHearts: HEARTS });
     this.#intro = new IntroOverlay(document.getElementById('overlay'));
     this.#bus = new EventBus();
     this.#bus.on('player:exitedShrine', () => this.#hud.banner.show(EXIT_BANNER_TEXT, EXIT_BANNER_MS));
+    this.#bus.on('player:died', () => this.#respawn());
     this.#wasInsideShrine = isInsideShrine(this.#player.state.position, this.#shrine);
 
     this.#loop = createGameLoop((dt) => this.update(dt), () => this.render());
@@ -218,7 +237,8 @@ export class Game {
     clampToCorridor(position, this.#shrine);
     const inside = this.#checkShrineExit(position);
     this.#world.chunks.update(position);
-    this.#combat.update(input, state, dt);
+    const hitbox = this.#combat.update(input, state, dt);
+    this.#updateBosses(hitbox, input.blockHeld, dt);
 
     this.#cameraRig.update(position, input, dt);
     if (inside) this.#keepCameraInCorridor(position);
@@ -232,10 +252,49 @@ export class Game {
     this.#hud.update({
       staminaRatio: stamina.ratio(),
       exhausted: stamina.exhausted,
-      hearts: HEARTS,
+      hearts: this.#vitals.hearts(),
       prompt: raw.pointerLocked ? '' : PROMPT_TEXT,
       player: { x: position.x, z: position.z, yaw: state.yaw },
     });
+  }
+
+  /**
+   * Steps every boss, applies the player's melee hitbox to them, takes boss strikes on the player
+   * (a raised shield softens them), keeps the boss body colliders in sync and feeds the boss bar.
+   * @param {object|null} hitbox The player's active melee hitbox this frame, if any.
+   * @param {boolean} guarding True while the guard button is held.
+   * @param {number} dt Seconds since the previous frame.
+   * @returns {void}
+   */
+  #updateBosses(hitbox, guarding, dt) {
+    const state = this.#player.state;
+    const { playerHits } = this.#bosses.update(state.position, dt);
+    if (hitbox && this.#bosses.applyPlayerHitbox(hitbox).length > 0) this.#combat.onHitLanded();
+    for (const { id, collider } of this.#bosses.colliders()) this.#collision.syncDynamic(`boss:${id}`, [collider]);
+    this.#vitals.update(dt);
+    const guardingWithShield = guarding && this.#combat.inventory.equippedShield() !== null;
+    const result = this.#vitals.takeHits(playerHits, { guarding: guardingWithShield });
+    if (result.died) this.#bus.emit('player:died');
+    const active = this.#bosses.activeBoss();
+    this.#bossBar.update(active ? { name: active.def.name, ratio: active.state.health.ratio() } : null);
+  }
+
+  /** Returns the player to the shrine with full hearts after a defeat. */
+  #respawn() {
+    const state = this.#player.state;
+    const spawn = this.#world.spawn;
+    state.position.x = spawn.x;
+    state.position.y = spawn.y;
+    state.position.z = spawn.z;
+    state.velocity.x = 0;
+    state.velocity.y = 0;
+    state.velocity.z = 0;
+    state.yaw = spawn.yaw;
+    state.mode = 'ground';
+    this.#vitals.respawn();
+    this.#hasExitedShrine = false;
+    this.#wasInsideShrine = true;
+    this.#hud.banner.show(DEATH_BANNER_TEXT, DEATH_BANNER_MS);
   }
 
   /**
@@ -268,7 +327,8 @@ export class Game {
    * Read-only handles for debugging and end-to-end tests (exposed as window.__game in dev).
    * @returns {{ player: Player, cameraRig: ThirdPersonCamera, camera: THREE.PerspectiveCamera,
    *   cycle: ReturnType<typeof createDayNightCycle>, world: ReturnType<typeof buildWorld>, scene: THREE.Scene,
-   *   collision: ReturnType<typeof createPlayerCollision>, combat: CombatController, hud: Hud }}
+   *   collision: ReturnType<typeof createPlayerCollision>, combat: CombatController, hud: Hud,
+   *   bosses: ReturnType<typeof createBossManager>, vitals: ReturnType<typeof createPlayerVitals> }}
    */
   get debug() {
     return {
@@ -281,6 +341,8 @@ export class Game {
       collision: this.#collision,
       combat: this.#combat,
       hud: this.#hud,
+      bosses: this.#bosses,
+      vitals: this.#vitals,
     };
   }
 

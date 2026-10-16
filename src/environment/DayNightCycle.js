@@ -19,11 +19,11 @@ const NIGHT_COLOUR = Object.freeze({ r: 0.2, g: 0.25, b: 0.4 });
 const MOON_COLOUR = Object.freeze({ r: 0.75, g: 0.85, b: 1.0 });
 
 /** Ambient (hemisphere) strength floor at midnight and ceiling at noon. */
-const AMBIENT_NIGHT = 0.45;
+const AMBIENT_NIGHT = 0.6;
 const AMBIENT_DAY = 0.75;
 /** Sky turbidity: hazy-free deep blue by day, clean dark sky at night. */
 const TURBIDITY_NIGHT = 1.5;
-const TURBIDITY_DAY = 5;
+const TURBIDITY_DAY = 3;
 /** Sine-of-elevation band over which the moon fades in after sunset (fully on at -0.35). */
 const MOON_FADE_ELEVATION = -0.35;
 

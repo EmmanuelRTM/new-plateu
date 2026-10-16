@@ -81,14 +81,14 @@ describe('createLighting', () => {
     expect(lighting.sun.intensity).toBe(0);
   });
 
-  it('moon intensity is 0 at noon and above 0.7 * peak (0.9) at midnight', () => {
+  it('moon intensity is 0 at noon and above 0.7 * peak (1.5) at midnight', () => {
     const day = setup(12);
     day.lighting.update(day.cycle, follow);
     expect(day.lighting.moon.intensity).toBe(0);
     const night = setup(0);
     night.lighting.update(night.cycle, follow);
-    expect(night.lighting.moon.intensity).toBeGreaterThan(0.7 * 0.9);
-    expect(night.lighting.moon.intensity).toBeLessThanOrEqual(0.9 + 1e-9);
+    expect(night.lighting.moon.intensity).toBeGreaterThan(0.7 * 1.5);
+    expect(night.lighting.moon.intensity).toBeLessThanOrEqual(1.5 + 1e-9);
   });
 
   it('places the moon 200 m from the followed position along moonDirection', () => {
@@ -118,14 +118,14 @@ describe('createLighting', () => {
     expect(lighting.sun.position.z).toBeCloseTo(follow.z + d.z * 200, 4);
   });
 
-  it('hemisphere intensity is about 1.0 at midnight and 1.6 at noon', () => {
+  it('hemisphere intensity is about 1.3 at midnight and 1.6 at noon', () => {
     const day = setup(12);
     day.lighting.update(day.cycle, follow);
     const night = setup(0);
     night.lighting.update(night.cycle, follow);
     expect(day.lighting.hemi.intensity).toBeCloseTo(1.6, 1);
-    expect(night.lighting.hemi.intensity).toBeGreaterThanOrEqual(0.9);
-    expect(night.lighting.hemi.intensity).toBeLessThanOrEqual(1.05);
+    expect(night.lighting.hemi.intensity).toBeGreaterThanOrEqual(1.2);
+    expect(night.lighting.hemi.intensity).toBeLessThanOrEqual(1.4);
   });
 
   it('uses a saturated sky blue by day and a deep blue (not near-black) at night', () => {
