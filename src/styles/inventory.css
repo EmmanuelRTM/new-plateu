@@ -1,0 +1,192 @@
+/* Weapon slot card (top-right) and weapon menu overlay. Colours and fonts come from base.css tokens. */
+
+:root {
+  --panel-bg: rgba(10, 14, 24, 0.78);
+  --panel-border: #9fdcff;
+  --panel-glow: rgba(159, 220, 255, 0.35);
+  --durability-ok: #8fe36b;
+  --durability-low: #e36b6b;
+  --zonai-accent: #7fb8d6;
+}
+
+[hidden] { display: none !important; }
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 0.35em;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  font-family: var(--font-ui);
+  font-size: 0.78em;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--hud-fg);
+}
+
+/* Shared durability bar, scoped to the widgets that draw it. */
+.weapon-slot .durability-track,
+.weapon-cell .durability-track {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.weapon-slot .durability-fill,
+.weapon-cell .durability-fill {
+  height: 100%;
+  background: var(--durability-ok);
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+.durability-fill.is-low { background: var(--durability-low); }
+
+/* Top-right card. */
+.weapon-slot {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 240px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  box-shadow: 0 0 12px var(--panel-glow);
+  color: var(--hud-fg);
+  font-family: var(--font-ui);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.weapon-slot-main { display: flex; gap: 10px; align-items: center; }
+.weapon-slot-icon { flex: 0 0 40px; height: 40px; color: var(--panel-border); }
+.weapon-slot-icon:empty { display: none; }
+.weapon-icon { width: 100%; height: 100%; display: block; overflow: visible; }
+.weapon-slot-text { flex: 1; min-width: 0; }
+.weapon-name {
+  font-size: 15px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.weapon-slot.is-unarmed .weapon-name { font-weight: normal; font-style: italic; opacity: 0.8; }
+.weapon-attack { font-size: 12px; opacity: 0.85; }
+.weapon-slot .durability { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.weapon-slot .durability-track { flex: 1; }
+.durability-value { font-size: 11px; opacity: 0.8; min-width: 3.5em; text-align: right; }
+.shield-chip {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--panel-border);
+}
+.weapon-hints { margin-top: 8px; font-size: 11px; line-height: 1.8; opacity: 0.9; }
+.weapon-slot-hint { margin-top: 4px; font-size: 12px; color: #f2a33a; }
+
+/* Centred overlay. Keyboard driven: never takes pointer events. */
+.weapon-menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  font-family: var(--font-ui);
+}
+.weapon-menu-panel {
+  width: min(680px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 16px 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  box-shadow: 0 0 24px var(--panel-glow);
+  color: var(--hud-fg);
+}
+.weapon-menu-title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: normal;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--panel-border);
+}
+.weapon-menu-body { display: flex; gap: 16px; flex-wrap: wrap; }
+.weapon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 300px;
+  flex: 0 0 auto;
+}
+.weapon-cell {
+  position: relative;
+  min-height: 84px;
+  padding: 6px 6px 8px;
+  border: 1px solid rgba(159, 220, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+.weapon-cell .weapon-icon { width: 28px; height: 28px; color: var(--hud-fg); }
+.weapon-cell .cell-key {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.weapon-cell .cell-name {
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.weapon-cell .durability-track { width: 100%; margin-top: auto; }
+.weapon-cell.is-empty { opacity: 0.45; }
+.weapon-cell.is-equipped {
+  border-color: var(--panel-border);
+  background: rgba(159, 220, 255, 0.16);
+  box-shadow: inset 0 0 10px var(--panel-glow);
+}
+.weapon-details { flex: 1 1 200px; min-width: 200px; font-size: 14px; line-height: 1.45; }
+.weapon-details h3 { margin: 0 0 4px; font-size: 18px; font-weight: normal; color: var(--panel-border); }
+.weapon-details p { margin: 4px 0; }
+.weapon-details .detail-type,
+.weapon-details .detail-note { font-size: 12px; opacity: 0.8; }
+.weapon-details .detail-description { font-style: italic; opacity: 0.9; }
+.weapon-details .detail-empty { opacity: 0.7; }
+
+.zonai-row {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(159, 220, 255, 0.2);
+  font-size: 12px;
+}
+.zonai-label { display: block; margin-bottom: 4px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--zonai-accent); }
+.zonai-list { display: flex; flex-wrap: wrap; gap: 6px 12px; list-style: none; margin: 0; padding: 0; }
+.zonai-list li.is-locked { opacity: 0.4; filter: grayscale(1); }
+.zonai-name { margin-right: 4px; }
+.zonai-status { font-style: italic; }
+
+.weapon-menu-footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(159, 220, 255, 0.2);
+  font-size: 12px;
+  opacity: 0.9;
+  text-align: center;
+}
