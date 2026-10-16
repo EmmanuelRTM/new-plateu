@@ -29,6 +29,7 @@ const ARMS_GLIDING = -1.5;
  * @property {(gliding: boolean) => void} setGliding   shows the paraglider and raises the arms
  * @property {(speedRatio: number) => void} setMoving  0..1 of max speed; drives the limb bob
  * @property {(dt: number) => void} update             advances the animation by dt seconds
+ * @property {{ left: THREE.Group, right: THREE.Group }} armPivots  shoulder pivots; attach held items here
  */
 
 /**
@@ -93,6 +94,7 @@ export function createPlayerMesh() {
 
   return {
     object,
+    armPivots: { left: arms[0], right: arms[1] },
     setGliding(value) {
       gliding = Boolean(value);
       glider.visible = gliding;
