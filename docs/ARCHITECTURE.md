@@ -23,9 +23,13 @@ src/
   core/Input.js                keyboard/mouse → InputState snapshot (Pointer Lock)
   world/WorldConfig.js         WORLD constants
   world/Prng.js                seeded PRNG (mulberry32) + helpers
-  world/terrainHeight.js       pure heightFn(x,z) for the plateau (noise + rim falloff)
-  world/HeightField.js         pure sampled height field: heightAt/normalAt/slopeAt
-  world/TerrainMesh.js         Three.js mesh from a HeightField (vertex colours)
+  world/terrainHeight.js       pure heightFn(x,z): plateau, rim, lowlands, river, mountain ring, arenas
+  world/HeightField.js         pure sampled height field: heightAt/normalAt/slopeAt (+ offset variant)
+  world/TerrainMesh.js         Three.js mesh from a HeightField (vertex colours, positioned by origin)
+  world/partition/chunkMath.js           pure chunk indices, keys, neighbourhoods, load/unload diff, seeds
+  world/partition/ChunkedHeightField.js  pure chunk-routed, LRU-cached height field (world coords)
+  world/partition/chunkVegetation.js     pure deterministic per-chunk scatter (trees/grass/rocks)
+  world/partition/ChunkManager.js        Three.js adapter: streams chunk groups around the player
   world/Water.js               flat water plane at WORLD.seaLevel
   world/vegetation/Placement.js  pure: deterministic scatter points on valid terrain
   world/vegetation/Trees.js      InstancedMesh trees
@@ -53,16 +57,23 @@ tests/   mirrors src/ (Vitest)        e2e/  Playwright specs
 ## Shared constants — `src/world/WorldConfig.js`
 ```js
 export const WORLD = Object.freeze({
-  size: 1024,            // metres, square, centred on origin: x,z ∈ [-512, 512]
-  resolution: 256,       // height samples per side (grid spacing = size/resolution = 4 m)
+  size: 4096,            // metres, square, centred on origin: x,z ∈ [-2048, 2048]
+  resolution: 1024,      // legacy global sampling resolution (far mesh uses WORLD.far.resolution)
   seed: 1337,
   seaLevel: 10,          // water plane y
   maxHeight: 140,
-  plateauRadius: 420,    // beyond this the ground falls away sharply (cliff rim)
+  plateauRadius: 420,    // beyond this the ground falls to the rim floor (cliff rim), then lowlands
   gravity: 28,           // m/s²
   spawn: Object.freeze({ x: 0, z: 0, yaw: 0 }),   // inside the shrine, facing the +z exit
   templeOfTime: Object.freeze({ x: -180, z: 140 }),
   shrine: Object.freeze({ x: 0, z: 0, exitDirection: Object.freeze({ x: 0, z: 1 }) }),
+  chunk: Object.freeze({ size: 256, resolution: 64, loadRadius: 3, unloadRadius: 4 }),
+  far: Object.freeze({ resolution: 128, yOffset: -1.5 }),
+  arenas: Object.freeze([                       // flat boss discs: { id, name, x, z, radius, y }
+    { id: 'talus', name: 'Talus Hollow', x: 300, z: 250, radius: 40, y: 48 },
+    { id: 'hinox', name: 'Hinox Grove', x: -280, z: -240, radius: 45, y: 52 },
+    { id: 'flux', name: 'Flux Construct Rise', x: 1100, z: -900, radius: 50, y: 34 },
+  ]),
 });
 ```
 Heights near the spawn and the temple are flattened by `terrainHeight.js` so landmarks sit level.
@@ -96,10 +107,12 @@ export function hash2D(x, z, seed) // deterministic [0,1) for integer lattice co
 
 // world/terrainHeight.js
 export function createTerrainHeightFn(config = WORLD) // → (x:number, z:number) => y:number
-// Layered value/simplex noise (own implementation, seeded) ⇒ rolling hills 15–90 m; smooth radial
-// falloff to below seaLevel for r > plateauRadius (cliff rim); flat disc of radius 24 m around
-// WORLD.shrine (y≈60) and radius 34 m around WORLD.templeOfTime (y≈75), each on a broad hill whose skirt
-// blends back to the natural terrain over ~120 m so the approach is a walkable (<25°) grass slope; a basin around (120, -160) that dips below seaLevel (lake).
+// Rolling hills 15–90 m on the plateau; cliff rim dropping to seaLevel − 15 beyond plateauRadius; flat
+// discs of radius 24 m around WORLD.shrine (y≈60) and 34 m around WORLD.templeOfTime (y≈75) on broad
+// hills (skirts ~160–180 m); a lake basin at (120, −160). Beyond the rim the ground blends (r ≈ 540 →
+// 690) into lowlands at seaLevel + 8…40 with a meandering river (bed below seaLevel − 3 within ~14 m of
+// x = 600 + 180·sin(z/400), |z| ≤ 1800). A mountain ring rises from r ≈ 1500 to 110–140 m at r ≈ 1900,
+// then falls to seaLevel − 20 beyond r ≈ 2030 (the natural edge). Arena discs are flattened last.
 
 // world/HeightField.js
 export function createHeightField({ size, resolution, heightFn })
@@ -107,13 +120,13 @@ export function createHeightField({ size, resolution, heightFn })
 // heightAt bilinearly interpolates; outside bounds clamps to edge.
 
 // world/TerrainMesh.js
-export function createTerrainMesh(heightField, { colours } = {})  // → THREE.Mesh (receiveShadow, vertex colours: grass/rock/sand by height+slope)
+export function createTerrainMesh(heightField, { colours, originX, originZ } = {})  // → THREE.Mesh 'Terrain' (receiveShadow, vertex colours); positioned at origin + size/2
 
 // world/Water.js
 export function createWater({ size, level })   // → THREE.Mesh (transparent blue plane at y=level)
 
 // world/vegetation/Placement.js (pure)
-export function scatterPoints({ count, size, prng, heightAt, slopeAt, isValid })
+export function scatterPoints({ count, size, originX, originZ, prng, heightAt, slopeAt, isValid })  // origin defaults to centred on 0
 // → Array<{x,y,z,rotation,scale}>; rejects points where !isValid(x,y,z,slope). Deterministic via prng.
 // world/vegetation/Trees.js | Grass.js | Rocks.js
 export function createTrees(points)  // → THREE.Group of InstancedMesh (castShadow). Same shape for createGrass, createRocks.
@@ -124,6 +137,40 @@ export function createShrineOfResurrection({ position, exitDirection, groundY })
 // world/landmarks/TempleOfTime.js
 export function createTempleOfTime({ position, groundY })  // → THREE.Group of broken stone walls, columns, a Goddess statue plinth at the far (north) end.
 ```
+
+## World partition (chunk streaming)
+The world is 4096 m. Terrain and vegetation exist only for chunks near the player; a low-detail
+**far terrain** (`FarTerrain`, 128 cells, sunk `far.yOffset` below the chunks) always fills the horizon.
+```js
+// world/partition/chunkMath.js (pure)
+export function chunkCoord(x, z, chunkSize)            // → {cx, cz} floor division; chunk (0,0) = [0,size)
+export function chunkKey(cx, cz)                       // → 'cx,cz'
+export function parseChunkKey(key)                     // → {cx, cz}
+export function chunkOrigin(cx, cz, chunkSize)         // → {x, z} minimum corner
+export function chunksAround(cx, cz, radius)           // → [{cx,cz}] square, nearest ring first
+export function diffChunkSets(current: Set<string>, wanted: string[], unloadRadius, centre) // → {toLoad, toUnload}
+export function chunkSeed(baseSeed, cx, cz)            // → deterministic uint32 (hash2D)
+export function isChunkInWorld(cx, cz, worldSize, chunkSize)
+
+// world/partition/ChunkedHeightField.js (pure)
+export function createChunkedHeightField({ worldSize, chunkSize, resolution, heightFn, maxCached = 128 })
+// → { size, chunkSize, resolution, heightAt, normalAt, slopeAt (world coords, clamped to world edge),
+//     chunkField(cx,cz) (cached HeightField with originX/originZ; throws outside world),
+//     retain(key) / release(key) (pin against LRU eviction), cachedCount() }
+// world/partition/chunkVegetation.js (pure)
+export function scatterChunkVegetation({ config, field, cx, cz }) // → {trees, grass, rocks} ScatterPoint[]
+// world/partition/ChunkManager.js (Three.js adapter)
+export function createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded })
+// → { group (THREE.Group 'Chunks', added to scene), update(position, { maxLoads = 2 }), loadedKeys(), dispose() }
+//   Loaded chunk = Group 'chunk:<key>' with terrain mesh + trees/grass/rocks InstancedMeshes.
+//   onChunkLoaded(key, { cx, cz, trees: ScatterPoint[], rocks: ScatterPoint[] })
+//   onChunkUnloaded(key)
+// core/WorldBuilder.js: buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnloaded } = {})
+//   → { heightField (chunked), terrain (FarTerrain), water, shrine, temple, chunks, spawn }
+//   Loads chunks around the spawn before returning. Per frame the game calls chunks.update(playerPosition).
+```
+Rules: chunks outside ±size/2 are never requested; adjacent chunks share edge samples exactly (no seams);
+vegetation per chunk uses that chunk's own `heightAt/slopeAt` and PRNG seeded by (world seed, cx, cz).
 
 ## Environment
 ```js

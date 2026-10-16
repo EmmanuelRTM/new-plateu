@@ -23,12 +23,17 @@ function resolvePalette(colours = {}) {
 /**
  * Builds a terrain mesh from a sampled height field. The PlaneGeometry grid layout matches the
  * HeightField sample layout (row-major, x fastest), so vertex i takes data[i] as its height.
+ * The geometry is centred, so the mesh is moved to (originX + size/2, 0, originZ + size/2); fields
+ * without an origin are treated as centred on the world origin.
  * @param {import('./HeightField.js').HeightField} heightField Sampled terrain.
- * @param {{ colours?: {grass?: number|string, rock?: number|string, sand?: number|string} }} [opts]
+ * @param {{ colours?: {grass?: number|string, rock?: number|string, sand?: number|string},
+ *   originX?: number, originZ?: number }} [opts] Colours, and an optional origin override.
  * @returns {THREE.Mesh} Mesh named "Terrain", receiveShadow = true, vertex-coloured.
  */
-export function createTerrainMesh(heightField, { colours } = {}) {
+export function createTerrainMesh(heightField, { colours, originX, originZ } = {}) {
   const { size, resolution, data } = heightField;
+  const ox = originX ?? heightField.originX ?? -size / 2;
+  const oz = originZ ?? heightField.originZ ?? -size / 2;
   const geometry = new THREE.PlaneGeometry(size, size, resolution, resolution);
   geometry.rotateX(-Math.PI / 2);
 
@@ -52,6 +57,7 @@ export function createTerrainMesh(heightField, { colours } = {}) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'Terrain';
+  mesh.position.set(ox + size / 2, 0, oz + size / 2);
   mesh.receiveShadow = true;
   return mesh;
 }
