@@ -93,6 +93,7 @@ describe('WorldMap errors', () => {
     expect(() => new WorldMap(parent, OPTS)).toThrow(/2D context/);
     spy.mockRestore();
   });
+});
 
 describe('WorldMap shared terrain canvas', () => {
   it('uses the given terrainCanvas instead of painting its own', () => {

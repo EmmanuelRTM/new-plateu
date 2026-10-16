@@ -109,6 +109,7 @@ describe('MiniMap errors', () => {
     expect(() => new MiniMap(parent, OPTS)).toThrow(/2D context/);
     spy.mockRestore();
   });
+});
 
 describe('MiniMap shared terrain canvas', () => {
   it('uses the given terrainCanvas instead of painting its own and adopts its size', () => {
