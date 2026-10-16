@@ -15,13 +15,14 @@ test.afterEach(() => {
 });
 
 test('walking forward out of the shrine shows the Great Plateau banner', async ({ page }) => {
-  test.setTimeout(60_000);
+  // Software-rendered frames are slow and dt is clamped, so the 27 m walk can take over a minute.
+  test.setTimeout(150_000);
   await startGame(page);
 
   await page.keyboard.down('KeyW');
   try {
     await expect
-      .poll(async () => (await readPlayer(page)).position.z, { timeout: 45_000 })
+      .poll(async () => (await readPlayer(page)).position.z, { timeout: 120_000 })
       .toBeGreaterThan(EXIT_Z);
   } finally {
     await page.keyboard.up('KeyW');
