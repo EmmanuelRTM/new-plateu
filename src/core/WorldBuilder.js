@@ -13,6 +13,7 @@ import { createShrineOfResurrection } from '../world/landmarks/ShrineOfResurrect
 import { createTempleOfTime } from '../world/landmarks/TempleOfTime.js';
 import { createChunkedHeightField } from '../world/partition/ChunkedHeightField.js';
 import { createChunkManager } from '../world/partition/ChunkManager.js';
+import { createTerrainMaterial } from '../world/terrainMaterial.js';
 
 /** Lift (m) added to the spawn height so the feet clear the corridor floor. */
 const SPAWN_LIFT = 0.05;
@@ -75,7 +76,8 @@ export function buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnload
 
   scene.add(terrain, water, shrine, temple);
 
-  const chunks = createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded });
+  const terrainMaterial = createTerrainMaterial({ seed: config.seed, chunkMetres: config.chunk.size });
+  const chunks = createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded, terrainMaterial });
   chunks.update(spawn, { maxLoads: Infinity });
 
   return { heightField, terrain, water, shrine, temple, chunks, spawn };

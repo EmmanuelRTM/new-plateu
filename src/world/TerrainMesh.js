@@ -26,11 +26,16 @@ function resolvePalette(colours = {}) {
  * The geometry is centred, so the mesh is moved to (originX + size/2, 0, originZ + size/2); fields
  * without an origin are treated as centred on the world origin.
  * @param {import('./HeightField.js').HeightField} heightField Sampled terrain.
+ * UVs are world-space metres divided by `uvMetres`, so a repeating detail texture continues
+ * seamlessly across neighbouring chunk meshes.
+ * @param {import('./HeightField.js').HeightField} heightField Sampled terrain.
  * @param {{ colours?: {grass?: number|string, rock?: number|string, sand?: number|string},
- *   originX?: number, originZ?: number }} [opts] Colours, and an optional origin override.
+ *   originX?: number, originZ?: number, material?: THREE.Material, uvMetres?: number }} [opts]
+ *   Colours, an optional origin override, a shared material (defaults to a plain vertex-coloured
+ *   standard material) and the world metres per UV unit (default 256).
  * @returns {THREE.Mesh} Mesh named "Terrain", receiveShadow = true, vertex-coloured.
  */
-export function createTerrainMesh(heightField, { colours, originX, originZ } = {}) {
+export function createTerrainMesh(heightField, { colours, originX, originZ, material, uvMetres = 256 } = {}) {
   const { size, resolution, data } = heightField;
   const ox = originX ?? heightField.originX ?? -size / 2;
   const oz = originZ ?? heightField.originZ ?? -size / 2;
@@ -54,8 +59,16 @@ export function createTerrainMesh(heightField, { colours, originX, originZ } = {
   }
   geometry.setAttribute('color', new THREE.BufferAttribute(rgb, 3));
 
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
-  const mesh = new THREE.Mesh(geometry, material);
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < position.count; i++) {
+    uv.setXY(i, (ox + size / 2 + position.getX(i)) / uvMetres, (oz + size / 2 + position.getZ(i)) / uvMetres);
+  }
+  uv.needsUpdate = true;
+
+  const mesh = new THREE.Mesh(
+    geometry,
+    material ?? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }),
+  );
   mesh.name = 'Terrain';
   mesh.position.set(ox + size / 2, 0, oz + size / 2);
   mesh.receiveShadow = true;

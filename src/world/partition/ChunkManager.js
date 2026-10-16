@@ -53,9 +53,11 @@ function disposeTree(root) {
  * @param {import('./ChunkedHeightField.js').ChunkedHeightField} options.heightField Chunk-routed height field.
  * @param {(key: string, payload: ChunkLoadPayload) => void} [options.onChunkLoaded] Called after a chunk is built.
  * @param {(key: string) => void} [options.onChunkUnloaded] Called after a chunk is freed.
+ * @param {THREE.Material|null} [options.terrainMaterial] Shared material for every chunk terrain mesh
+ *   (world-space UVs keep its textures continuous across chunks); null uses a plain vertex-colour material.
  * @returns {ChunkManager}
  */
-export function createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded }) {
+export function createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded, terrainMaterial = null }) {
   const chunkSize = config.chunk.size;
   const group = new THREE.Group();
   group.name = 'Chunks';
@@ -75,7 +77,10 @@ export function createChunkManager({ scene, config, heightField, onChunkLoaded, 
     const chunkGroup = new THREE.Group();
     chunkGroup.name = `chunk:${key}`;
     const { trees, grass, rocks } = scatterChunkVegetation({ config, field, cx, cz });
-    chunkGroup.add(createTerrainMesh(field), createTrees(trees), createGrass(grass), createRocks(rocks));
+    chunkGroup.add(
+      createTerrainMesh(field, { material: terrainMaterial ?? undefined, uvMetres: chunkSize }),
+      createTrees(trees), createGrass(grass), createRocks(rocks),
+    );
     group.add(chunkGroup);
     loaded.set(key, { group: chunkGroup, cx, cz });
     if (onChunkLoaded) onChunkLoaded(key, { cx, cz, trees, rocks });

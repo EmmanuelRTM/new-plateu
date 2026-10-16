@@ -24,11 +24,11 @@ describe('createTrees', () => {
     expect(group).toBeInstanceOf(THREE.Group);
   });
 
-  it('has trunk and canopy InstancedMeshes with count = points.length', () => {
+  it('has 4 InstancedMeshes (trunk + canopy per variant) whose counts sum to 2 x points.length', () => {
     const meshes = instancedChildren(group);
-    expect(meshes).toHaveLength(2);
+    expect(meshes).toHaveLength(4);
+    expect(meshes.reduce((n, m) => n + m.count, 0)).toBe(POINTS.length * 2);
     for (const m of meshes) {
-      expect(m.count).toBe(POINTS.length);
       expect(m.castShadow).toBe(true);
       expect(m.receiveShadow).toBe(true);
     }
@@ -69,7 +69,7 @@ describe('createGrass', () => {
     const geo = instancedChildren(group)[0].geometry;
     geo.computeBoundingBox();
     expect(geo.boundingBox.min.y).toBeCloseTo(0);
-    expect(geo.boundingBox.max.y).toBeCloseTo(0.5);
+    expect(geo.boundingBox.max.y).toBeCloseTo(0.6);
   });
 });
 
@@ -89,11 +89,13 @@ describe('createRocks', () => {
     expect(mesh.receiveShadow).toBe(true);
   });
 
-  it('uses flat-shaded standard material with the rock colour', () => {
-    const mat = instancedChildren(group)[0].material;
+  it('uses flat-shaded standard material with per-vertex stone and moss colours', () => {
+    const mesh = instancedChildren(group)[0];
+    const mat = mesh.material;
     expect(mat).toBeInstanceOf(THREE.MeshStandardMaterial);
     expect(mat.flatShading).toBe(true);
+    expect(mat.vertexColors).toBe(true);
     expect(mat.roughness).toBeCloseTo(0.95);
-    expect(mat.color.getHexString()).toBe('8a8d86');
+    expect(mesh.geometry.attributes.color.count).toBe(mesh.geometry.attributes.position.count);
   });
 });

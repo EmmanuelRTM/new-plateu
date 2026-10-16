@@ -65,8 +65,30 @@ describe('createWater', () => {
     const water = createWater({ size: 512, level: WORLD.seaLevel });
     expect(water.position.y).toBe(WORLD.seaLevel);
     expect(water.material.transparent).toBe(true);
-    expect(water.material.opacity).toBeCloseTo(0.75, 6);
-    expect(water.material.roughness).toBeCloseTo(0.2, 6);
-    expect(water.material.metalness).toBeCloseTo(0.1, 6);
+    expect(water.material.opacity).toBeCloseTo(0.82, 6);
+    expect(water.material.roughness).toBeCloseTo(0.15, 6);
+    expect(water.material.metalness).toBeCloseTo(0.05, 6);
+  });
+});
+
+describe('createTerrainMesh world-space UVs and shared material', () => {
+  it('writes UVs in world metres / uvMetres so neighbouring chunks are continuous', async () => {
+    const { createOffsetHeightField } = await import('../../src/world/HeightField.js');
+    const a = createTerrainMesh(createOffsetHeightField({ originX: 0, originZ: 0, size: 64, resolution: 2, heightFn: () => 1 }), { uvMetres: 64 });
+    const b = createTerrainMesh(createOffsetHeightField({ originX: 64, originZ: 0, size: 64, resolution: 2, heightFn: () => 1 }), { uvMetres: 64 });
+    const uvA = a.geometry.attributes.uv;
+    const uvB = b.geometry.attributes.uv;
+    // vertex 2 is the +x edge of the first row in A; vertex 0 is the -x edge of the first row in B.
+    expect(uvA.getX(2)).toBeCloseTo(1, 6);
+    expect(uvB.getX(0)).toBeCloseTo(1, 6);
+    expect(uvA.getY(0)).toBeCloseTo(uvB.getY(0), 6);
+  });
+
+  it('uses the given shared material instead of creating one', async () => {
+    const THREE = await import('three');
+    const shared = new THREE.MeshStandardMaterial();
+    const hf = { size: 8, resolution: 1, data: new Float32Array(4), heightAt: () => 0 };
+    const mesh = createTerrainMesh(hf, { material: shared });
+    expect(mesh.material).toBe(shared);
   });
 });
