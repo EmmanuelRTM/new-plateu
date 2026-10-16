@@ -26,6 +26,7 @@ import { tickWind } from '../world/vegetation/windUniforms.js';
 import { createBossManager } from '../enemies/BossManager.js';
 import { BossBar } from '../ui/BossBar.js';
 import { createPlayerVitals } from './playerVitals.js';
+import { arrowHitbox } from '../combat/projectiles.js';
 import { createStars } from '../environment/Stars.js';
 
 const DAY_LENGTH_SECONDS = 720;
@@ -166,6 +167,7 @@ export class Game {
       hudRoot: this.#hud.root,
       menuParent: document.getElementById('overlay'),
     });
+    this.#scene.add(this.#combat.arrowObject);
     this.#bossBar = new BossBar(this.#hud.root);
     this.#bosses = createBossManager({
       scene: this.#scene,
@@ -238,7 +240,11 @@ export class Game {
     clampToCorridor(position, this.#shrine);
     const inside = this.#checkShrineExit(position);
     this.#world.chunks.update(position);
-    const hitbox = this.#combat.update(input, state, dt);
+    const hitbox = this.#combat.update(input, state, dt, {
+      cameraYaw: this.#cameraRig.yaw,
+      cameraPitch: this.#cameraRig.pitch,
+      heightAt: this.#world.heightField.heightAt,
+    });
     this.#updateBosses(hitbox, input.blockHeld, dt);
 
     this.#cameraRig.update(position, input, dt);
@@ -272,6 +278,10 @@ export class Game {
     const state = this.#player.state;
     const { playerHits } = this.#bosses.update(state.position, dt);
     if (hitbox && this.#bosses.applyPlayerHitbox(hitbox).length > 0) this.#combat.onHitLanded();
+    for (const arrow of this.#combat.projectiles.arrows) {
+      const arrowBox = arrowHitbox(arrow);
+      if (arrowBox && this.#bosses.applyPlayerHitbox(arrowBox).length > 0) arrow.state = 'done';
+    }
     for (const { id, collider } of this.#bosses.colliders()) this.#collision.syncDynamic(`boss:${id}`, [collider]);
     this.#vitals.update(dt);
     const guardingWithShield = guarding && this.#combat.inventory.equippedShield() !== null;

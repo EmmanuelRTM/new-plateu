@@ -7,7 +7,8 @@ function input(overrides = {}) {
   return {
     moveX: 0, moveZ: 0, sprint: false, jumpHeld: false, jumpPressed: false, interactPressed: false,
     anyKeyPressed: false, mouseDX: 0, mouseDY: 0, pointerLocked: true, attackPressed: false,
-    blockHeld: false, menuPressed: false, mapPressed: false, cycleDelta: 0, slotPressed: 0, ...overrides,
+    blockHeld: false, menuPressed: false, mapPressed: false, cycleDelta: 0, slotPressed: 0,
+    abilityPressed: false, abilityCyclePressed: false, cancelPressed: false, ...overrides,
   };
 }
 
@@ -71,5 +72,41 @@ describe('CombatController', () => {
     combat.update(input(), player, 0.016);
     expect(hud.querySelector('.weapon-slot').textContent).toContain('Your weapon broke!');
     expect(combat.update(input({ attackPressed: true }), player, 0.016)).toBeNull();
+  });
+
+  it('with a bow equipped, attacking draws and fires one arrow along the camera look direction', () => {
+    combat.update(input({ slotPressed: 3 }), player, 0.016); // traveler-bow
+    expect(combat.equippedDef().type).toBe('bow');
+    const arrowsBefore = combat.inventory.arrows;
+    const env = { cameraYaw: 0, cameraPitch: -0.3, heightAt: () => -100 };
+    expect(combat.update(input({ attackPressed: true }), player, 0.016, env)).toBeNull();
+    expect(combat.bow.phase).toBe('draw');
+    for (let i = 0; i < 30; i++) combat.update(input(), player, 0.016, env);
+    expect(combat.inventory.arrows).toBe(arrowsBefore - 1);
+    expect(combat.projectiles.count).toBe(1);
+    const arrow = combat.projectiles.arrows[0];
+    expect(arrow.velocity.z).toBeLessThan(0); // camera yaw 0 looks toward -z
+    expect(arrow.velocity.y).toBeGreaterThan(0); // pitched up
+    expect(arrow.damage).toBe(5);
+    expect(combat.arrowMeshes.object.count).toBe(1);
+    expect(hud.querySelector('.weapon-arrows').textContent).toContain(`${arrowsBefore - 1}`);
+  });
+
+  it('does not draw the bow when the quiver is empty', () => {
+    combat.update(input({ slotPressed: 3 }), player, 0.016);
+    combat.inventory.arrows = 0;
+    combat.update(input({ attackPressed: true }), player, 0.016);
+    expect(combat.bow.phase).toBe('idle');
+    expect(combat.projectiles.count).toBe(0);
+  });
+
+  it('arrows land on the terrain and are removed after they expire', () => {
+    combat.update(input({ slotPressed: 3 }), player, 0.016);
+    const env = { cameraYaw: 0, cameraPitch: 0.4, heightAt: () => 0 };
+    combat.update(input({ attackPressed: true }), player, 0.016, env);
+    for (let i = 0; i < 40; i++) combat.update(input(), player, 0.016, env);
+    expect(combat.projectiles.arrows[0].state).toBe('stuck');
+    for (let i = 0; i < 200; i++) combat.update(input(), player, 0.05, env);
+    expect(combat.projectiles.count).toBe(0);
   });
 });
