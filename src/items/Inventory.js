@@ -21,22 +21,28 @@ import { getItem } from './itemCatalog.js';
  * @property {(delta: number) => void} cycle   moves the equip to the next/previous occupied slot, wrapping
  * @property {(amount?: number) => { broke: boolean }} useDurability  wears the equipped item
  * @property {() => InventoryItem|null} equippedShield  first shield in the inventory, or null
- * @property {() => { capacity: number, equipIndex: number, slots: Array<InventoryItem|null> }} serialize
+ * @property {number} arrows                  arrows in the quiver
+ * @property {number} maxArrows               quiver capacity
+ * @property {(count: number) => number} addArrows  adds arrows, clamped to maxArrows; returns the new count
+ * @property {() => boolean} useArrow         spends one arrow; false (no change) when the quiver is empty
+ * @property {() => { capacity: number, equipIndex: number, arrows: number, slots: Array<InventoryItem|null> }} serialize
  */
 
 /**
  * Creates an inventory with a fixed number of slots.
  * The first item added while nothing is equipped is equipped automatically.
- * @param {{ capacity?: number }} [options]
+ * @param {{ capacity?: number, arrows?: number, maxArrows?: number }} [options]
+ *   capacity: number of slots; arrows: starting quiver count (clamped to maxArrows); maxArrows: quiver limit
  * @returns {Inventory}
  * @throws {RangeError} When capacity is not a positive integer.
  */
-export function createInventory({ capacity = 9 } = {}) {
+export function createInventory({ capacity = 9, arrows = 20, maxArrows = 99 } = {}) {
   if (!Number.isInteger(capacity) || capacity < 1) {
     throw new RangeError(`Inventory capacity must be a positive integer, got ${capacity}`);
   }
   /** @type {Array<InventoryItem|null>} */
   const slots = new Array(capacity).fill(null);
+  const quiverLimit = Math.max(0, Math.trunc(maxArrows));
 
   /** @type {Inventory} */
   const inv = {
@@ -81,10 +87,24 @@ export function createInventory({ capacity = 9 } = {}) {
     equippedShield() {
       return slots.find((s) => s !== null && getItem(s.id).type === 'shield') ?? null;
     },
+    arrows: Math.min(quiverLimit, Math.max(0, Math.trunc(arrows))),
+    maxArrows: quiverLimit,
+    addArrows(count) {
+      if (!Number.isFinite(count) && count !== Infinity) return inv.arrows;
+      if (count <= 0) return inv.arrows;
+      inv.arrows = Math.min(quiverLimit, inv.arrows + Math.trunc(Math.min(count, quiverLimit)));
+      return inv.arrows;
+    },
+    useArrow() {
+      if (inv.arrows <= 0) return false;
+      inv.arrows -= 1;
+      return true;
+    },
     serialize() {
       return {
         capacity,
         equipIndex: inv.equipIndex,
+        arrows: inv.arrows,
         slots: slots.map((s) => (s === null ? null : { ...s })),
       };
     },

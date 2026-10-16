@@ -266,9 +266,64 @@ describe('Inventory.serialize', () => {
     expect(snap).toEqual({
       capacity: 3,
       equipIndex: 0,
+      arrows: 20,
       slots: [{ id: 'traveler-sword', durability: 22, maxDurability: 22 }, null, null],
     });
     snap.slots[0].durability = 1;
     expect(inv.slots[0].durability).toBe(22);
+  });
+});
+
+describe('Inventory arrow quiver', () => {
+  it('starts with 20 arrows and a maximum of 99 by default', () => {
+    const inv = createInventory();
+    expect(inv.arrows).toBe(20);
+    expect(inv.maxArrows).toBe(99);
+  });
+
+  it('honours custom arrow and maximum counts', () => {
+    const inv = createInventory({ arrows: 5, maxArrows: 10 });
+    expect(inv.arrows).toBe(5);
+    expect(inv.maxArrows).toBe(10);
+  });
+
+  it('clamps the starting arrows to the maximum', () => {
+    expect(createInventory({ arrows: 50, maxArrows: 10 }).arrows).toBe(10);
+  });
+
+  it('addArrows adds to the count and returns the new total', () => {
+    const inv = createInventory();
+    expect(inv.addArrows(5)).toBe(25);
+    expect(inv.arrows).toBe(25);
+  });
+
+  it('addArrows clamps to maxArrows', () => {
+    const inv = createInventory({ arrows: 95, maxArrows: 99 });
+    expect(inv.addArrows(30)).toBe(99);
+    expect(inv.arrows).toBe(99);
+  });
+
+  it('addArrows ignores negative and non-finite amounts', () => {
+    const inv = createInventory();
+    expect(inv.addArrows(-4)).toBe(20);
+    expect(inv.addArrows(Number.NaN)).toBe(20);
+    expect(inv.addArrows(Infinity)).toBe(99);
+  });
+
+  it('useArrow spends one arrow and returns true', () => {
+    const inv = createInventory({ arrows: 1 });
+    expect(inv.useArrow()).toBe(true);
+    expect(inv.arrows).toBe(0);
+  });
+
+  it('useArrow returns false and changes nothing when empty', () => {
+    const inv = createInventory({ arrows: 0 });
+    expect(inv.useArrow()).toBe(false);
+    expect(inv.arrows).toBe(0);
+  });
+
+  it('serialize includes the arrow count', () => {
+    const inv = createInventory({ arrows: 7 });
+    expect(inv.serialize().arrows).toBe(7);
   });
 });

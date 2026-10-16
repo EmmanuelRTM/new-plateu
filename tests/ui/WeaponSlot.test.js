@@ -119,3 +119,43 @@ describe('WeaponSlot', () => {
     expect(root.querySelector('.durability').hidden).toBe(true);
   });
 });
+
+describe('WeaponSlot arrows', () => {
+  it('shows the arrow counter for a bow and hides it otherwise', () => {
+    const { slot, root } = setup();
+    const chip = root.querySelector('.weapon-arrows');
+    expect(chip.hidden).toBe(true);
+    slot.update({ item: inv('traveler-bow', 22), arrows: 12 });
+    expect(chip.hidden).toBe(false);
+    expect(chip.textContent).toBe('Arrows ×12');
+    slot.update({ item: inv('traveler-sword', 22), arrows: 12 });
+    expect(chip.hidden).toBe(true);
+  });
+
+  it('marks the counter empty when there are no arrows', () => {
+    const { slot, root } = setup();
+    const chip = root.querySelector('.weapon-arrows');
+    slot.update({ item: inv('zonaite-bow', 22), arrows: 0 });
+    expect(chip.classList.contains('is-empty')).toBe(true);
+    expect(chip.textContent).toBe('Arrows ×0');
+    slot.update({ item: inv('zonaite-bow', 22), arrows: 3 });
+    expect(chip.classList.contains('is-empty')).toBe(false);
+  });
+
+  it('shows LMB Shoot for a bow and LMB Attack for other weapons', () => {
+    const { slot, root } = setup();
+    const row = root.querySelector('.weapon-hints');
+    slot.update({ item: inv('traveler-bow', 22), arrows: 5 });
+    expect(row.textContent).toContain('LMB Shoot');
+    expect(row.textContent).not.toContain('Attack');
+    slot.update({ item: inv('traveler-sword', 22) });
+    expect(row.textContent).toContain('LMB Attack');
+    expect(row.textContent).not.toContain('Shoot');
+  });
+
+  it('shows LMB Attack when unarmed', () => {
+    const { slot, root } = setup();
+    slot.update({ item: null });
+    expect(root.querySelector('.weapon-hints').textContent).toContain('LMB Attack');
+  });
+});

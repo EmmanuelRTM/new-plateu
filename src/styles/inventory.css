@@ -84,6 +84,16 @@ kbd {
   font-size: 11px;
   color: var(--panel-border);
 }
+.weapon-arrows {
+  display: inline-block;
+  margin: 8px 0 0 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--panel-border);
+}
+.weapon-arrows.is-empty { color: #f2a33a; border-color: #f2a33a; }
 .weapon-hints { margin-top: 8px; font-size: 11px; line-height: 1.8; opacity: 0.9; }
 .weapon-slot-hint { margin-top: 4px; font-size: 12px; color: #f2a33a; }
 

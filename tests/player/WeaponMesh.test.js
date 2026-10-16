@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { createWeaponMesh } from '../../src/player/WeaponMesh.js';
+import { createWeaponMesh, createArrowGeometry, createArrowMaterial } from '../../src/player/WeaponMesh.js';
 import { getItem, ITEM_TYPES } from '../../src/items/itemCatalog.js';
 
 /** Collects every material colour and emissive hex used under an object. */
@@ -173,5 +173,47 @@ describe('setSwing', () => {
     expect(w.object.rotation.x).toBeCloseTo(0.8, 10);
     w.setSwing(Number.NaN, 'sword');
     expect(w.object.rotation.x).toBeCloseTo(0, 10);
+  });
+});
+
+describe('bow draw', () => {
+  it('raises the bow hand forward as the draw progresses', () => {
+    const w = createWeaponMesh();
+    w.setItem(getItem('traveler-bow'));
+    w.setSwing(0, 'bow');
+    expect(w.object.rotation.x).toBeCloseTo(0, 10);
+    w.setSwing(0.5, 'bow');
+    const half = w.object.rotation.x;
+    w.setSwing(1, 'bow');
+    expect(w.object.rotation.x).toBeCloseTo(-1.3, 2);
+    expect(half).toBeLessThan(0);
+    expect(half).toBeGreaterThan(-1.3);
+  });
+
+  it('pulls the nock back along -Z as the draw progresses', () => {
+    const w = createWeaponMesh();
+    w.setItem(getItem('traveler-bow'));
+    const nock = w.object.getObjectByName('nock');
+    expect(nock).toBeDefined();
+    w.setSwing(1, 'bow');
+    expect(nock.position.z).toBeCloseTo(-0.25, 10);
+    w.setSwing(0, 'bow');
+    expect(nock.position.z).toBeCloseTo(0, 10);
+  });
+});
+
+describe('createArrowGeometry and createArrowMaterial', () => {
+  it('builds a geometry with a position attribute and a merged set of parts', () => {
+    const geo = createArrowGeometry();
+    expect(geo).toBeInstanceOf(THREE.BufferGeometry);
+    expect(geo.getAttribute('position').count).toBeGreaterThan(0);
+    geo.computeBoundingBox();
+    // Tip points along +Z, the nock sits at the origin.
+    expect(geo.boundingBox.max.z).toBeGreaterThan(0.8);
+    expect(geo.boundingBox.min.z).toBeGreaterThanOrEqual(-0.01);
+  });
+
+  it('returns a standard material', () => {
+    expect(createArrowMaterial()).toBeInstanceOf(THREE.MeshStandardMaterial);
   });
 });

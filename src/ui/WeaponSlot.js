@@ -5,6 +5,8 @@ import { getItem } from '../items/itemCatalog.js';
 /** Durability percentage below which the bar turns to the warning colour. */
 const LOW_DURABILITY_PERCENT = 25;
 const EMPTY_NAME = 'Unarmed — Tab to choose a weapon';
+/** Label for the left mouse button when a bow is equipped. */
+const BOW_ATTACK_LABEL = 'Shoot';
 const HINT_TEXT = [
   ['LMB', 'Attack'],
   ['RMB', 'Guard'],
@@ -80,7 +82,7 @@ export function durabilityPercent(durability, maxDurability) {
 }
 
 /**
- * Top-right card showing the equipped weapon, durability, the equipped shield and the key hints.
+ * Top-right card showing the equipped weapon, durability, the equipped shield, the arrow count and the key hints.
  */
 export class WeaponSlot {
   /**
@@ -105,27 +107,32 @@ export class WeaponSlot {
 
     this.shieldChip = createElement('span', 'shield-chip');
     this.shieldChip.hidden = true;
+    this.arrowChip = createElement('span', 'weapon-arrows');
+    this.arrowChip.hidden = true;
     this.hintRow = createElement('div', 'weapon-hints');
     this.hintRow.appendChild(buildHintRow());
+    this.attackLabel = this.hintRow.querySelector('.hint-action');
     this.extraHint = createElement('div', 'weapon-slot-hint');
     this.extraHint.hidden = true;
 
-    this.root.append(this.main, this.shieldChip, this.hintRow, this.extraHint);
+    this.root.append(this.main, this.shieldChip, this.arrowChip, this.hintRow, this.extraHint);
     this.iconType = null;
     parent.appendChild(this.root);
   }
 
   /**
-   * Shows the equipped weapon, its durability, the equipped shield and an optional extra hint.
+   * Shows the equipped weapon, its durability, the equipped shield, the arrow count (bows only),
+   * the left-click label and an optional extra hint.
    * @param {{ item?: { id: string, durability: number, maxDurability: number }|null,
    *   shield?: { id: string, durability: number, maxDurability: number }|null,
-   *   hint?: string }} state
+   *   hint?: string, arrows?: number }} state
    *   item: the equipped InventoryItem, or null for the unarmed state;
    *   shield: the equipped shield InventoryItem, or null;
-   *   hint: optional line shown under the key hints; hidden when empty.
+   *   hint: optional line shown under the key hints; hidden when empty;
+   *   arrows: arrows in the quiver, shown only while a bow is equipped.
    * @returns {void}
    */
-  update({ item = null, shield = null, hint = '' } = {}) {
+  update({ item = null, shield = null, hint = '', arrows = 0 } = {}) {
     if (item) {
       this.#showItem(item);
     } else {
@@ -133,6 +140,11 @@ export class WeaponSlot {
     }
     this.shieldChip.hidden = shield === null;
     this.shieldChip.textContent = shield ? `Shield: ${getItem(shield.id).name}` : '';
+    const isBow = item !== null && getItem(item.id).type === 'bow';
+    this.arrowChip.hidden = !isBow;
+    this.arrowChip.textContent = isBow ? `Arrows ×${arrows}` : '';
+    this.arrowChip.classList.toggle('is-empty', isBow && arrows <= 0);
+    this.attackLabel.textContent = isBow ? BOW_ATTACK_LABEL : 'Attack';
     this.extraHint.textContent = hint;
     this.extraHint.hidden = hint.length === 0;
   }
@@ -184,7 +196,8 @@ function buildHintRow() {
   HINT_TEXT.forEach(([key, label], i) => {
     if (i > 0) frag.appendChild(document.createTextNode(' · '));
     frag.appendChild(createElement('kbd', null, key));
-    frag.appendChild(document.createTextNode(` ${label}`));
+    frag.appendChild(document.createTextNode(' '));
+    frag.appendChild(createElement('span', i === 0 ? 'hint-action' : null, label));
   });
   frag.appendChild(document.createTextNode(' · '));
   frag.appendChild(createElement('kbd', null, 'Q'));

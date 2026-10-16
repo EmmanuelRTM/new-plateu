@@ -4,8 +4,10 @@
  * and the blade points along local -Y when the arm hangs down. The shield's `shieldObject` attaches
  * to the left-arm pivot with its face toward local +Z.
  * Official docs: https://threejs.org/docs/ (Group, Mesh, CylinderGeometry, BoxGeometry, TorusGeometry).
+ * Arrow geometry merges parts with https://threejs.org/manual/#en/buffergeometry (BufferGeometryUtils addon).
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ATTACK_TIMINGS } from '../combat/attackState.js';
 
 /** Hand offset from the right-arm pivot to the grip (the arm capsule ends about 0.5 m below the pivot). */
@@ -25,6 +27,16 @@ const SWING_ARCS = Object.freeze({
 });
 /** Spear thrust distance in metres at the peak of the stab. */
 const SPEAR_THRUST = 0.7;
+/** Bow draw: hand pitch (rad, about X) at full draw and how far the nock is pulled back (m). */
+const BOW_AIM_PITCH = -1.3;
+const BOW_PULL = 0.25;
+/** Arrow dimensions in metres. The arrow is built along +Z with its nock at the origin. */
+const SHAFT_LENGTH = 0.8;
+const SHAFT_RADIUS = 0.015;
+const HEAD_LENGTH = 0.08;
+const HEAD_RADIUS = 0.03;
+const FLETCH_LENGTH = 0.12;
+const FLETCH_HEIGHT = 0.05;
 
 /**
  * @typedef {Object} WeaponMeshHandle
@@ -74,7 +86,8 @@ export function createWeaponMesh() {
 
 /**
  * Poses the hand group for a swing. Sword and claymore: rest, then raise during windup, then sweep
- * through the arc during active. Spear: thrust forward. Bows and shields: rest.
+ * through the arc during active. Spear: thrust forward. Bow: raise forward and pull the nock back as
+ * the draw progresses. Shields: rest.
  * @param {THREE.Group} hand
  * @param {number} progress 0..1 (NaN counts as 0)
  * @param {string} type weapon type
@@ -84,7 +97,13 @@ function applySwing(hand, progress, type) {
   const p = Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0;
   hand.rotation.set(0, 0, 0);
   hand.position.set(HAND_OFFSET.x, HAND_OFFSET.y, HAND_OFFSET.z);
+  setNockPull(hand, type === 'bow' ? p : 0);
   if (p <= 0) return;
+
+  if (type === 'bow') {
+    hand.rotation.x = BOW_AIM_PITCH * p;
+    return;
+  }
 
   if (type === 'spear') {
     const s = Math.sin(Math.PI * p);
@@ -106,6 +125,17 @@ function applySwing(hand, progress, type) {
     hand.rotation.x = lerp(arc.raised.x, arc.end.x, k);
     hand.rotation.y = lerp(arc.raised.y, arc.end.y, k);
   }
+}
+
+/**
+ * Slides the bow's nock back along -Z by the draw amount. Does nothing when no bow is held.
+ * @param {THREE.Group} hand
+ * @param {number} draw 0..1
+ * @returns {void}
+ */
+function setNockPull(hand, draw) {
+  const nock = hand.getObjectByName('nock');
+  if (nock) nock.position.z = -BOW_PULL * draw;
 }
 
 /**
@@ -243,6 +273,50 @@ function addBow(group, mats) {
   const stringX = -0.5 + 0.5 * Math.cos(arc / 2);
   const stringMaterial = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.9 });
   group.add(part(new THREE.BoxGeometry(0.006, 0.784, 0.006), stringMaterial, 0, stringX, 0));
+  const nock = part(new THREE.BoxGeometry(0.02, 0.02, 0.02), mats.wood, 0, stringX, 0);
+  nock.name = 'nock';
+  group.add(nock);
+}
+
+/**
+ * Builds one arrow: a shaft, a cone head and two crossed fletching fins, merged into one geometry.
+ * The arrow is built along +Z with the nock at the origin and the tip at +Z.
+ * Official docs: https://threejs.org/docs/#api/en/geometries/CylinderGeometry
+ * @returns {THREE.BufferGeometry}
+ */
+export function createArrowGeometry() {
+  const shaft = new THREE.CylinderGeometry(SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 6);
+  shaft.rotateX(Math.PI / 2);
+  shaft.translate(0, 0, SHAFT_LENGTH / 2);
+
+  const head = new THREE.ConeGeometry(HEAD_RADIUS, HEAD_LENGTH, 6);
+  head.rotateX(Math.PI / 2);
+  head.translate(0, 0, SHAFT_LENGTH + HEAD_LENGTH / 2);
+
+  const fletchZ = FLETCH_LENGTH / 2 + 0.01;
+  // Vertical fin: spans Z (length) and Y (height).
+  const finA = new THREE.PlaneGeometry(FLETCH_LENGTH, FLETCH_HEIGHT);
+  finA.rotateY(Math.PI / 2);
+  finA.translate(0, 0, fletchZ);
+  // Horizontal fin: spans X (height) and Z (length).
+  const finB = new THREE.PlaneGeometry(FLETCH_HEIGHT, FLETCH_LENGTH);
+  finB.rotateX(Math.PI / 2);
+  finB.translate(0, 0, fletchZ);
+
+  return mergeGeometries([shaft, head, finA, finB]);
+}
+
+/**
+ * Material shared by the arrow parts. Double-sided so the thin fins show from both sides.
+ * @returns {THREE.MeshStandardMaterial}
+ */
+export function createArrowMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0xb08a5a,
+    roughness: 0.7,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  });
 }
 
 /**
