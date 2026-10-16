@@ -136,3 +136,39 @@ describe('createChunkedHeightField', () => {
     expect(() => f.release('0,0')).toThrow(/retain/);
   });
 });
+
+describe('installChunk and hasChunk', () => {
+  it('reports whether a chunk field is cached', () => {
+    const f = make();
+    expect(f.hasChunk(0, 0)).toBe(false);
+    f.chunkField(0, 0);
+    expect(f.hasChunk(0, 0)).toBe(true);
+  });
+
+  it('installs a field from pre-sampled data without calling heightFn', () => {
+    const spy = vi.fn(fn);
+    const f = createChunkedHeightField({ worldSize: WORLD_SIZE, chunkSize: CHUNK, resolution: RES, heightFn: spy });
+    const data = new Float32Array((RES + 1) ** 2).fill(42);
+    const field = f.installChunk(1, -1, data);
+    expect(spy).not.toHaveBeenCalled();
+    expect(field.data).toBe(data);
+    expect(field.originX).toBe(CHUNK);
+    expect(field.originZ).toBe(-CHUNK);
+    expect(f.hasChunk(1, -1)).toBe(true);
+    expect(f.chunkField(1, -1)).toBe(field);
+    expect(f.heightAt(CHUNK + 5, -CHUNK + 5)).toBeCloseTo(42, 4);
+  });
+
+  it('is a no-op when the chunk is already cached and returns the cached field', () => {
+    const f = make();
+    const cached = f.chunkField(0, 0);
+    const other = f.installChunk(0, 0, new Float32Array((RES + 1) ** 2));
+    expect(other).toBe(cached);
+  });
+
+  it('refuses data of the wrong length or a chunk outside the world', () => {
+    const f = make();
+    expect(() => f.installChunk(0, 0, new Float32Array(5))).toThrow(/length/);
+    expect(() => f.installChunk(3, 0, new Float32Array((RES + 1) ** 2))).toThrow(RangeError);
+  });
+});

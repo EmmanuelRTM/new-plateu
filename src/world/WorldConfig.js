@@ -14,7 +14,7 @@ export const WORLD = Object.freeze({
   templeOfTime: Object.freeze({ x: -180, z: 140 }),
   shrine: Object.freeze({ x: 0, z: 0, exitDirection: Object.freeze({ x: 0, z: 1 }) }),
   // World partition: terrain + vegetation are generated per chunk around the player.
-  chunk: Object.freeze({ size: 256, resolution: 64, loadRadius: 3, unloadRadius: 4 }),
+  chunk: Object.freeze({ size: 256, resolution: 64, underwaterResolution: 16, loadRadius: 3, unloadRadius: 4 }),
   // Always-visible low-detail terrain covering the whole world, sunk just below the chunks.
   far: Object.freeze({ resolution: 128, yOffset: -1.5 }),
   // Flat discs for boss fights (the boss agent builds the encounters on top of these).

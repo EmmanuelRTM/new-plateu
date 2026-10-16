@@ -15,7 +15,7 @@ describe('WORLD (world partition contract)', () => {
   });
 
   it('defines 256 m chunks of 64 cells with load and unload hysteresis', () => {
-    expect(WORLD.chunk).toEqual({ size: 256, resolution: 64, loadRadius: 3, unloadRadius: 4 });
+    expect(WORLD.chunk).toEqual({ size: 256, resolution: 64, underwaterResolution: 16, loadRadius: 3, unloadRadius: 4 });
     expect(WORLD.size % WORLD.chunk.size).toBe(0);
   });
 

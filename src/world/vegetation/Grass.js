@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fillInstances } from './instancing.js';
 import { WIND } from './windUniforms.js';
+import { cachedOrCreate } from './vegetationCache.js';
 
 const BLADE_HEIGHT = 0.6;
 const ROOT_COLOUR = new THREE.Color(0x2f5a22);
@@ -85,17 +86,15 @@ export function addWindSway(material) {
 /**
  * Creates one grass InstancedMesh with one tuft per point.
  * @param {{ x: number, y: number, z: number, rotation: number, scale: number }[]} points
+ * @param {import('./vegetationCache.js').VegetationCache} [cache] Optional cache for the shared
+ *   tuft geometry and wind-swaying material.
  * @returns {THREE.Group} Group holding the single grass InstancedMesh (no shadows).
  */
-export function createGrass(points) {
-  const material = addWindSway(
-    new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      side: THREE.DoubleSide,
-      roughness: 0.9,
-    }),
-  );
-  const mesh = new THREE.InstancedMesh(createTuftGeometry(), material, points.length);
+export function createGrass(points, cache) {
+  const material = cachedOrCreate(cache, 'grass-material', () =>
+    addWindSway(new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.9 })));
+  const geometry = cachedOrCreate(cache, 'grass-tuft-geometry', () => createTuftGeometry());
+  const mesh = new THREE.InstancedMesh(geometry, material, points.length);
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   fillInstances(mesh, points);

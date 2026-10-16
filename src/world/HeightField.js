@@ -1,3 +1,5 @@
+import { sampleChunkGrid } from './partition/sampleChunk.js';
+
 /**
  * Sampled height grid with bilinear lookup, normals and slope. Pure module (no Three.js).
  */
@@ -9,6 +11,8 @@
  * @property {number} originX World x of the minimum-corner sample (grid column 0).
  * @property {number} originZ World z of the minimum-corner sample (grid row 0).
  * @property {Float32Array} data Row-major samples: index = j*(resolution+1)+i, x = originX+i*step, z = originZ+j*step.
+ * @property {number} minHeight Lowest sample.
+ * @property {number} maxHeight Highest sample.
  * @property {(x: number, z: number) => number} heightAt Bilinear height at world (x, z); clamps outside bounds.
  * @property {(x: number, z: number) => {x:number,y:number,z:number}} normalAt Unit normal from central differences.
  * @property {(x: number, z: number) => number} slopeAt Slope angle in radians (acos of normal.y).
@@ -18,17 +22,30 @@
  * Samples heightFn on a (resolution+1)² grid whose minimum corner is (originX, originZ), and returns
  * lookup helpers that take world coordinates. Adjacent fields built from the same heightFn share
  * their edge samples exactly, so tiles built this way join without seams.
- * @param {{ originX: number, originZ: number, size: number, resolution: number, heightFn: (x: number, z: number) => number }} opts
+ * Pass `data` (pre-sampled by sampleChunkGrid, e.g. in a worker) to skip sampling; heightFn is then
+ * not needed.
+ * @param {{ originX: number, originZ: number, size: number, resolution: number,
+ *   heightFn?: (x: number, z: number) => number, data?: Float32Array }} opts
  * @returns {HeightField}
+ * @throws {Error} When `data` is given with the wrong length, or when neither data nor heightFn is given.
  */
-export function createOffsetHeightField({ originX, originZ, size, resolution, heightFn }) {
+export function createOffsetHeightField({ originX, originZ, size, resolution, heightFn, data: presampled }) {
   const n = resolution + 1;
   const step = size / resolution;
-  const data = new Float32Array(n * n);
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      data[j * n + i] = heightFn(originX + i * step, originZ + j * step);
+  let data = presampled;
+  if (data) {
+    if (data.length !== n * n) {
+      throw new Error(`createOffsetHeightField: data length ${data.length} does not match (${n})^2`);
     }
+  } else {
+    if (!heightFn) throw new Error('createOffsetHeightField: needs either heightFn or data');
+    data = sampleChunkGrid({ originX, originZ, size, resolution, heightFn });
+  }
+  let minHeight = Infinity;
+  let maxHeight = -Infinity;
+  for (const h of data) {
+    if (h < minHeight) minHeight = h;
+    if (h > maxHeight) maxHeight = h;
   }
 
   const clampIdx = (v) => Math.min(resolution, Math.max(0, v));
@@ -82,7 +99,7 @@ export function createOffsetHeightField({ originX, originZ, size, resolution, he
     return Math.acos(Math.min(1, Math.max(-1, normalAt(x, z).y)));
   }
 
-  return { size, resolution, originX, originZ, data, heightAt, normalAt, slopeAt };
+  return { size, resolution, originX, originZ, data, minHeight, maxHeight, heightAt, normalAt, slopeAt };
 }
 
 /**

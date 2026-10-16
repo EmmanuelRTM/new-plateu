@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { fillInstances } from './instancing.js';
 import { hash2D } from '../Prng.js';
 import { smoothstep } from '../noise.js';
+import { cachedOrCreate } from './vegetationCache.js';
 
 const ROCK_COLOUR = new THREE.Color(0x8a8d86);
 const MOSS_COLOUR = new THREE.Color(0x5d7a3a);
@@ -71,19 +72,21 @@ function paintRock(geo) {
  * Creates one InstancedMesh of rocks, one per point. Each rock is sunk so 20% of its
  * height is below the terrain point.
  * @param {{ x: number, y: number, z: number, rotation: number, scale: number }[]} points
+ * @param {import('./vegetationCache.js').VegetationCache} [cache] Optional cache for the shared
+ *   rock geometry and material.
  * @returns {THREE.Group} Group holding the rock InstancedMesh (cast + receive shadows).
  */
-export function createRocks(points) {
-  const geometry = createRockGeometry();
-  geometry.computeBoundingBox();
+export function createRocks(points, cache) {
+  const geometry = cachedOrCreate(cache, 'rock-geometry', () => {
+    const geo = createRockGeometry();
+    geo.computeBoundingBox();
+    return geo;
+  });
   const minY = geometry.boundingBox.min.y;
   const maxY = geometry.boundingBox.max.y;
 
-  const material = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: 0.95,
-    flatShading: true,
-  });
+  const material = cachedOrCreate(cache, 'rock-material', () =>
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
   const mesh = new THREE.InstancedMesh(geometry, material, points.length);
   mesh.castShadow = true;
   mesh.receiveShadow = true;

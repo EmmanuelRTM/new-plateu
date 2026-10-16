@@ -1,8 +1,9 @@
 # Rust optimisation plan (Rust → WebAssembly)
 
-Status: **proposal, not implemented**. Adding a build-time Rust toolchain and a `.wasm` artefact is a
-change to the engineering rules (rule 5, "no extra runtime dependencies beyond `three` without explicit
-approval"), so nothing below ships until the owner approves it.
+Status: **step 0 (Web Worker) done; the Wasm steps are still a proposal, not implemented**. Adding a
+build-time Rust toolchain and a `.wasm` artefact is a change to the engineering rules (rule 5, "no extra
+runtime dependencies beyond `three` without explicit approval"), so nothing below the Web Worker step
+ships until the owner approves it.
 
 ## Why not PyO3
 
@@ -78,8 +79,28 @@ built in) and compares `sample_chunk` against `createTerrainHeightFn` for 10 000
   and `WebAssembly.instantiateStreaming` (official Vite guidance: https://vite.dev/guide/features#webassembly).
 - No new npm runtime dependency: `wasm-bindgen`'s glue is plain generated JS inside the repo.
 
+## Step 0: Web Worker height sampling (done)
+
+Chunk height grids are sampled off the main thread, with a synchronous fallback:
+
+- `src/world/partition/sampleChunk.js` (pure) exports `sampleChunkGrid({ originX, originZ, size, resolution, heightFn })`.
+  It returns the `(resolution+1)²` row-major grid that `createOffsetHeightField` uses. **This is the function a
+  future Wasm `sample_chunk` replaces.** The Wasm export has the same inputs and the same output layout, so
+  `ChunkedHeightField.installChunk(cx, cz, data)` and the chunk manager need no change when it lands.
+- `src/world/partition/heightWorker.js` is the worker entry. It builds the terrain height function once per
+  config and runs `sampleChunkGrid` on each request, then transfers the `Float32Array` back.
+- `src/world/partition/HeightWorkerPool.js` round-robins requests over a fixed set of workers, matches replies
+  by id and rejects requests whose worker failed. `ChunkManager` requests far chunks from it, installs the
+  replies, and falls back to sampling on the main thread when a request fails (logged once per chunk).
+- Chunks within one chunk of the player are still sampled synchronously, so the ground under the player
+  always exists on the frame it is needed.
+
+The Wasm plan below keeps this structure: a Wasm `sample_chunk` runs inside the same worker, so the
+worker stays the unit of parallelism and the main thread only sees the typed-array reply.
+
 ## Rollout
 
+0. **Done**: Web Worker height sampling (see above).
 1. **Approve** the rule-5 exception (Rust toolchain + committed `pkg/`).
 2. Port `noise.rs` + `terrain.rs`; add the bit-exactness Vitest; wire `sample_chunk` behind a feature
    flag `WORLD.useWasm` with automatic fallback to the JS height function if the module fails to load
@@ -93,7 +114,7 @@ built in) and compares `sample_chunk` against `createTerrainHeightFn` for 10 000
 ## Alternatives considered
 
 - **Web Workers (JS only)**: moving chunk generation off the main thread removes the spike without
-  Rust. Cheaper to adopt and keeps one language; recommended as step 0 regardless of Wasm.
+  Rust. Cheaper to adopt and keeps one language. Adopted as step 0 (done, see above).
 - **AssemblyScript**: TypeScript-like → Wasm; rejected because rule 2 forbids TypeScript in the repo.
 - **GPU (compute in a fragment shader)**: height sampling on the GPU is fast but reading results back
   for collision is slow; rejected.

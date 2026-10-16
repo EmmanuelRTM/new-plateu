@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { fillInstances } from './instancing.js';
 import { TREE_VARIANTS, createTrunkGeometry, createCanopyGeometry } from './treeGeometry.js';
+import { cachedOrCreate } from './vegetationCache.js';
 
 const TRUNK_COLOUR = 0x6b4a2b;
 
@@ -28,24 +29,25 @@ export function splitTreePoints(points) {
 /**
  * Creates instanced trees, one per point, in two variants.
  * @param {ScatterPoint[]} points
+ * @param {import('./vegetationCache.js').VegetationCache} [cache] Optional cache for the shared
+ *   geometries and materials; without it they are built fresh on every call.
  * @returns {THREE.Group} Group holding 4 InstancedMeshes (trunk + canopy per variant), all casting
  *   and receiving shadows.
  */
-export function createTrees(points) {
+export function createTrees(points, cache) {
   const group = new THREE.Group();
-  const trunkMat = new THREE.MeshStandardMaterial({ color: TRUNK_COLOUR, roughness: 0.9 });
-  const canopyMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    vertexColors: true,
-    flatShading: true,
-    roughness: 0.85,
-  });
+  const trunkMat = cachedOrCreate(cache, 'tree-trunk-material', () =>
+    new THREE.MeshStandardMaterial({ color: TRUNK_COLOUR, roughness: 0.9 }));
+  const canopyMat = cachedOrCreate(cache, 'tree-canopy-material', () =>
+    new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, flatShading: true, roughness: 0.85 }));
   const split = splitTreePoints(points);
   for (const name of /** @type {const} */ (['slender', 'broad'])) {
     const variant = TREE_VARIANTS[name];
     const subset = split[name];
-    const trunk = new THREE.InstancedMesh(createTrunkGeometry(variant), trunkMat, subset.length);
-    const canopy = new THREE.InstancedMesh(createCanopyGeometry(variant), canopyMat, subset.length);
+    const trunkGeometry = cachedOrCreate(cache, `tree-${name}-trunk`, () => createTrunkGeometry(variant));
+    const canopyGeometry = cachedOrCreate(cache, `tree-${name}-canopy`, () => createCanopyGeometry(variant));
+    const trunk = new THREE.InstancedMesh(trunkGeometry, trunkMat, subset.length);
+    const canopy = new THREE.InstancedMesh(canopyGeometry, canopyMat, subset.length);
     trunk.name = `trees-${name}-trunk`;
     canopy.name = `trees-${name}-canopy`;
     for (const mesh of [trunk, canopy]) {

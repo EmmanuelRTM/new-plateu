@@ -55,9 +55,14 @@ src/
   world/Water.js               water plane at WORLD.seaLevel with scrolling ripple normals
   world/partition/chunkMath.js           pure chunk indices, keys, neighbourhoods, load/unload diff, seeds
   world/partition/ChunkedHeightField.js  pure chunk-routed, LRU-cached height field (world coords)
+  world/partition/sampleChunk.js         pure sampleChunkGrid: one chunk's height grid (worker + main thread)
+  world/partition/coarsenField.js        pure coarser copy of a height field (sea-floor chunks)
+  world/partition/heightWorker.js        worker entry: samples chunk grids off the main thread
+  world/partition/HeightWorkerPool.js    main-thread adapter: round-robin pool of height workers
   world/partition/chunkVegetation.js     pure deterministic per-chunk scatter (trees/grass/rocks)
   world/partition/ChunkManager.js        Three.js adapter: streams chunk groups around the player
   world/vegetation/Placement.js  pure: deterministic scatter points on valid terrain
+  world/vegetation/vegetationCache.js  shared vegetation geometries/materials (createVegetationCache)
   world/vegetation/Trees.js | Grass.js | Rocks.js | instancing.js | treeGeometry.js   InstancedMesh vegetation
   world/vegetation/windUniforms.js  shared wind clock for vegetation shaders
   world/materials/textureNoise.js       pure tileable noise, normal maps, palette colouring
@@ -103,7 +108,7 @@ export const WORLD = Object.freeze({
   templeOfTime: Object.freeze({ x: -180, z: 140 }),
   shrine: Object.freeze({ x: 0, z: 0, exitDirection: Object.freeze({ x: 0, z: 1 }) }),
   // World partition: terrain + vegetation are generated per chunk around the player.
-  chunk: Object.freeze({ size: 256, resolution: 64, loadRadius: 3, unloadRadius: 4 }),
+  chunk: Object.freeze({ size: 256, resolution: 64, underwaterResolution: 16, loadRadius: 3, unloadRadius: 4 }),
   // Always-visible low-detail terrain covering the whole world, sunk just below the chunks.
   far: Object.freeze({ resolution: 128, yOffset: -1.5 }),
   // Flat discs for boss fights (the boss agent builds the encounters on top of these).
@@ -336,7 +341,8 @@ export function terrainColour(height, slope, palette = DEFAULT_PALETTE, seaLevel
 export function createHeightField({ size, resolution, heightFn })
 // → { size, resolution, data:Float32Array((resolution+1)²), heightAt(x,z), normalAt(x,z)→{x,y,z}, slopeAt(x,z)→radians }
 // heightAt bilinearly interpolates; outside bounds clamps to edge.
-export function createOffsetHeightField({ originX, originZ, size, resolution, heightFn })  // same shape, minimum corner at origin
+export function createOffsetHeightField({ originX, originZ, size, resolution, heightFn, data })  // same shape, minimum corner at origin;
+// `data` (pre-sampled by sampleChunkGrid) replaces heightFn. Also exposes minHeight / maxHeight over the samples.
 
 // world/TerrainMesh.js
 export function createTerrainMesh(heightField, { colours, originX, originZ, material, uvMetres = 256 } = {})
@@ -350,7 +356,8 @@ export function createWater({ size, level, seed = 1337 })   // → THREE.Mesh 'W
 export function scatterPoints({ count, size, originX, originZ, prng, heightAt, slopeAt, isValid })  // origin defaults to centred on 0
 // → Array<{x,y,z,rotation,scale}>; rejects points where !isValid(x,y,z,slope). Deterministic via prng.
 // world/vegetation/Trees.js | Grass.js | Rocks.js
-export function createTrees(points)  // → THREE.Group of InstancedMesh (castShadow). Same shape for createGrass, createRocks.
+export function createTrees(points, cache?)  // → THREE.Group of InstancedMesh (castShadow). Same shape for createGrass, createRocks.
+// cache (optional VegetationCache) supplies the shared geometries and materials; without it they are built per call.
 
 // world/vegetation/windUniforms.js
 export const WIND = { time: { value: 0 } };   // shared uniform; vegetation shaders reference WIND.time
@@ -382,19 +389,45 @@ export function isChunkInWorld(cx, cz, worldSize, chunkSize)
 export function createChunkedHeightField({ worldSize, chunkSize, resolution, heightFn, maxCached = 128 })
 // → { size, chunkSize, resolution, heightAt, normalAt, slopeAt (world coords, clamped to world edge),
 //     chunkField(cx,cz) (cached HeightField with originX/originZ; throws outside world),
-//     retain(key) / release(key) (pin against LRU eviction), cachedCount() }
+//     installChunk(cx, cz, data) (caches a field from pre-sampled data; no-op if cached; returns the field),
+//     hasChunk(cx, cz), retain(key) / release(key) (pin against LRU eviction), cachedCount() }
 // world/partition/chunkVegetation.js (pure)
 export function scatterChunkVegetation({ config, field, cx, cz }) // → {trees, grass, rocks} ScatterPoint[]
+// world/partition/sampleChunk.js (pure)
+export function sampleChunkGrid({ originX, originZ, size, resolution, heightFn })  // → Float32Array((resolution+1)²), same layout as createOffsetHeightField.data.
+//   The function a future Wasm `sample_chunk` replaces (docs/RUST_PLAN.md).
+// world/partition/coarsenField.js (pure)
+export function coarsenHeightField(field, resolution)  // → coarser HeightField over the same square (or `field` when not coarser)
+// world/partition/heightWorker.js (worker entry, no exports)
+//   onmessage {id, config, originX, originZ, size, resolution} → postMessage {id, data: Float32Array} (transferred) | {id, error}.
+//   Caches the height function for the last config it saw.
+// world/partition/HeightWorkerPool.js (DOM Worker adapter, no Three.js)
+export function createHeightWorkerPool({ config, workerFactory = defaultWorkerFactory, size = 2 })
+// → { request({cx, cz, originX, originZ, size, resolution}) → Promise<Float32Array>, pending (getter, count), dispose() }
+//   Round-robin over `size` workers; replies matched by id; a worker error rejects its pending requests.
+//   dispose() terminates the workers; pending requests never settle and late replies are ignored.
+//   defaultWorkerFactory = () => new Worker(new URL('./heightWorker.js', import.meta.url), { type: 'module' })
+// world/vegetation/vegetationCache.js (Three.js adapter)
+export function createVegetationCache()  // → { get(key, factory) (memoised, sets userData.shared = true), dispose() }
+export function cachedOrCreate(cache, key, factory)  // cache ? cache.get(...) : factory()
 // world/partition/ChunkManager.js (Three.js adapter)
-export function createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded, terrainMaterial = null })
-// → { group (THREE.Group 'Chunks', added to scene), update(position, { maxLoads = 2 }), loadedKeys(), dispose() }
+export function createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded, terrainMaterial = null,
+  vegetationCache = createVegetationCache(), heightPool = null })
+// → { group (THREE.Group 'Chunks', added to scene), update(position, { maxLoads = 2, sync = false }), loadedKeys(),
+//     inFlight() (chunks being sampled by the pool), dispose() }
 //   Loaded chunk = Group 'chunk:<key>' with a terrain mesh (shared terrainMaterial when given) and
-//   trees/grass/rocks InstancedMeshes.
+//   trees/grass/rocks InstancedMeshes, which share cached geometries and materials. Unload frees only per-chunk
+//   resources (terrain geometry, InstancedMesh instance buffers); dispose() also disposes the vegetation cache.
+//   Underwater chunks (maxHeight < seaLevel − 2) get a coarse terrain (config.chunk.underwaterResolution) and no vegetation.
+//   With heightPool, chunks farther than Chebyshev 1 from the player whose field is not cached are requested from the
+//   pool once and built after the reply (rejections are logged once per key and built on the main thread).
+//   Chunks within distance 1 and cached chunks are built synchronously as before.
 //   onChunkLoaded(key, { cx, cz, trees: ScatterPoint[], rocks: ScatterPoint[] })
 //   onChunkUnloaded(key)
-// core/WorldBuilder.js: buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnloaded } = {})
+// core/WorldBuilder.js: buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnloaded, heightPool = null } = {})
 //   → { heightField (chunked), terrain (FarTerrain), water, shrine, temple, chunks, spawn }
-//   Loads chunks around the spawn before returning (maxLoads Infinity). Per frame Game calls chunks.update(playerPosition).
+//   Loads chunks around the spawn before returning (maxLoads Infinity, sync: true, so the pool is not used there).
+//   Per frame Game calls chunks.update(playerPosition).
 //   spawn = shrine spawn lifted 0.05 m, yaw = atan2(exit.x, exit.z) so the player faces the exit.
 ```
 Rules: chunks outside ±size/2 are never requested; adjacent chunks share edge samples exactly (no seams);

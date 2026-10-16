@@ -20,6 +20,9 @@ import { chunkCoord, chunkKey, chunkOrigin, parseChunkKey, isChunkInWorld } from
  * @property {(key: string) => void} retain Pins a chunk's field so the LRU cache will not evict it.
  * @property {(key: string) => void} release Undoes one retain; throws when the key is not retained.
  * @property {() => number} cachedCount Number of chunk fields currently cached.
+ * @property {(cx: number, cz: number) => boolean} hasChunk True when the chunk field is cached.
+ * @property {(cx: number, cz: number, data: Float32Array) => HeightField} installChunk Caches a field built
+ *   from pre-sampled data (e.g. a worker reply). No-op when already cached; returns the cached field.
  */
 
 /**
@@ -78,6 +81,17 @@ export function createChunkedHeightField({ worldSize, chunkSize, resolution, hei
   }
 
   /**
+   * Validates a chunk index against the world.
+   * @param {number} cx Chunk index on x.
+   * @param {number} cz Chunk index on z.
+   */
+  function assertInWorld(cx, cz) {
+    if (!isChunkInWorld(cx, cz, worldSize, chunkSize)) {
+      throw new RangeError(`installChunk: chunk ${cx},${cz} is outside the world`);
+    }
+  }
+
+  /**
    * Field of the chunk containing (x, z); out-of-world points use the nearest edge chunk.
    * @param {number} x World x.
    * @param {number} z World z.
@@ -116,5 +130,26 @@ export function createChunkedHeightField({ worldSize, chunkSize, resolution, hei
     },
     /** @returns {number} */
     cachedCount: () => cache.size,
+    /** @param {number} cx @param {number} cz @returns {boolean} */
+    hasChunk: (cx, cz) => cache.has(chunkKey(cx, cz)),
+    /**
+     * @param {number} cx Chunk index on x.
+     * @param {number} cz Chunk index on z.
+     * @param {Float32Array} data Pre-sampled (resolution+1)² grid in the chunk's layout.
+     * @returns {HeightField}
+     */
+    installChunk(cx, cz, data) {
+      assertInWorld(cx, cz);
+      const key = chunkKey(cx, cz);
+      const cached = cache.get(key);
+      if (cached) return cached;
+      const origin = chunkOrigin(cx, cz, chunkSize);
+      const field = createOffsetHeightField({
+        originX: origin.x, originZ: origin.z, size: chunkSize, resolution, data,
+      });
+      cache.set(key, field);
+      evict();
+      return field;
+    },
   };
 }

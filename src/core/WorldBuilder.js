@@ -35,10 +35,12 @@ const SPAWN_LIFT = 0.05;
  * before this returns, so the spawn area exists on the first frame.
  * @param {import('three').Scene} scene Scene that receives the far terrain, water, landmarks and the chunk group.
  * @param {typeof WORLD} [config=WORLD] World configuration.
- * @param {{ onChunkLoaded?: Function, onChunkUnloaded?: Function }} [callbacks] Chunk lifecycle hooks, forwarded to the chunk manager.
+ * @param {{ onChunkLoaded?: Function, onChunkUnloaded?: Function, heightPool?: object|null }} [callbacks]
+ *   Chunk lifecycle hooks and an optional height worker pool, forwarded to the chunk manager. The
+ *   initial fill around the spawn is always synchronous.
  * @returns {WorldHandles}
  */
-export function buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnloaded } = {}) {
+export function buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnloaded, heightPool = null } = {}) {
   const heightFn = createTerrainHeightFn(config);
   const heightField = createChunkedHeightField({
     worldSize: config.size,
@@ -84,8 +86,10 @@ export function buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnload
 
   scene.add(terrain, water, shrine, temple);
 
-  const chunks = createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded, terrainMaterial });
-  chunks.update(spawn, { maxLoads: Infinity });
+  const chunks = createChunkManager({
+    scene, config, heightField, onChunkLoaded, onChunkUnloaded, terrainMaterial, heightPool,
+  });
+  chunks.update(spawn, { maxLoads: Infinity, sync: true });
 
   return { heightField, terrain, water, shrine, temple, chunks, spawn };
 }
