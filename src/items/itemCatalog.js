@@ -205,13 +205,13 @@ export function getItem(id) {
 }
 
 /**
- * Zonai abilities shown in the weapon menu as "coming soon". Not implemented.
- * @type {ReadonlyArray<{ id: string, name: string, key: string, description: string, implemented: false }>}
+ * Zonai abilities shown in the weapon menu. Implemented abilities show their key; the rest show "coming soon".
+ * @type {ReadonlyArray<{ id: string, name: string, key: string, description: string, implemented: boolean }>}
  */
 export const ZONAI_ABILITIES = Object.freeze([
-  Object.freeze({ id: 'ultrahand', name: 'Ultrahand', key: '—', description: 'Attach and join objects.', implemented: false }),
-  Object.freeze({ id: 'fuse', name: 'Fuse', key: '—', description: 'Fuse items to a weapon.', implemented: false }),
-  Object.freeze({ id: 'ascend', name: 'Ascend', key: '—', description: 'Rise through ceilings.', implemented: false }),
-  Object.freeze({ id: 'recall', name: 'Recall', key: '—', description: 'Reverse the motion of objects.', implemented: false }),
+  Object.freeze({ id: 'ultrahand', name: 'Ultrahand', key: 'F', description: 'Attach and join objects.', implemented: true }),
+  Object.freeze({ id: 'fuse', name: 'Fuse', key: 'F', description: 'Fuse items to a weapon.', implemented: true }),
+  Object.freeze({ id: 'ascend', name: 'Ascend', key: 'F', description: 'Rise through ceilings.', implemented: true }),
+  Object.freeze({ id: 'recall', name: 'Recall', key: 'F', description: 'Reverse the motion of objects.', implemented: true }),
   Object.freeze({ id: 'autobuild', name: 'Autobuild', key: '—', description: 'Repair broken constructs.', implemented: false }),
 ]);

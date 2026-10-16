@@ -127,7 +127,7 @@ describe('WeaponMenu details pane', () => {
 });
 
 describe('WeaponMenu Zonai row and footer', () => {
-  it('lists the five Zonai abilities greyed out as coming soon', () => {
+  it('lists the five Zonai abilities in order', () => {
     const { menu, root } = setup();
     menu.open(sampleInventory());
     const items = [...root.querySelectorAll('.zonai-row li')];
@@ -138,10 +138,25 @@ describe('WeaponMenu Zonai row and footer', () => {
       'Recall',
       'Autobuild',
     ]);
+  });
+
+  it('shows the key for implemented abilities and leaves them unlocked', () => {
+    const { menu, root } = setup();
+    menu.open(sampleInventory());
+    const items = [...root.querySelectorAll('.zonai-row li')].slice(0, 4);
     for (const li of items) {
-      expect(li.classList.contains('is-locked')).toBe(true);
-      expect(li.textContent).toContain('coming soon');
+      expect(li.classList.contains('is-locked')).toBe(false);
+      expect(li.querySelector('.zonai-status').textContent).toBe('F');
+      expect(li.textContent).not.toContain('coming soon');
     }
+  });
+
+  it('greys out Autobuild as coming soon', () => {
+    const { menu, root } = setup();
+    menu.open(sampleInventory());
+    const li = root.querySelectorAll('.zonai-row li')[4];
+    expect(li.classList.contains('is-locked')).toBe(true);
+    expect(li.textContent).toContain('coming soon');
   });
 
   it('shows the key footer', () => {

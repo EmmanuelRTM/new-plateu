@@ -159,3 +159,17 @@ describe('WeaponSlot arrows', () => {
     expect(root.querySelector('.weapon-hints').textContent).toContain('LMB Attack');
   });
 });
+
+describe('WeaponSlot fused attack', () => {
+  it('shows only ATK for an unfused weapon', () => {
+    const { slot, root } = setup();
+    slot.update({ item: inv('traveler-sword', 22) });
+    expect(root.querySelector('.weapon-attack').textContent).toBe('ATK 5');
+  });
+
+  it('shows the total ATK and the fuse bonus next to it when fused', () => {
+    const { slot, root } = setup();
+    slot.update({ item: { id: 'traveler-sword', durability: 47, maxDurability: 47, fused: { kind: 'boulder', bonus: 6 } } });
+    expect(root.querySelector('.weapon-attack').textContent).toBe('ATK 11 · +6 fused');
+  });
+});

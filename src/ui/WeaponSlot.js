@@ -1,6 +1,7 @@
 import '../styles/inventory.css';
 import { createElement, createSvgElement } from './dom.js';
 import { getItem } from '../items/itemCatalog.js';
+import { fusedAttack } from '../abilities/fuse.js';
 
 /** Durability percentage below which the bar turns to the warning colour. */
 const LOW_DURABILITY_PERCENT = 25;
@@ -82,6 +83,17 @@ export function durabilityPercent(durability, maxDurability) {
 }
 
 /**
+ * Attack line for the card: total damage including any fuse bonus, then the bonus when fused.
+ * @param {{ attack: number }} def catalog definition
+ * @param {{ fused?: { bonus: number } }} item inventory item
+ * @returns {string} e.g. "ATK 5", or "ATK 11 · +6 fused"
+ */
+export function attackLabel(def, item) {
+  const total = fusedAttack(def, item);
+  return item.fused ? `ATK ${total} · +${item.fused.bonus} fused` : `ATK ${total}`;
+}
+
+/**
  * Top-right card showing the equipped weapon, durability, the equipped shield, the arrow count and the key hints.
  */
 export class WeaponSlot {
@@ -158,7 +170,7 @@ export class WeaponSlot {
     this.#setIcon(def.type);
     this.root.classList.remove('is-unarmed');
     this.name.textContent = def.name;
-    this.attack.textContent = `ATK ${def.attack}`;
+    this.attack.textContent = attackLabel(def, item);
     this.durabilityRow.hidden = false;
     const percent = durabilityPercent(item.durability, item.maxDurability);
     this.fill.style.width = `${percent}%`;

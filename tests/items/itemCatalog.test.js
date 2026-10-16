@@ -77,14 +77,25 @@ describe('getItem', () => {
 });
 
 describe('ZONAI_ABILITIES', () => {
-  it('lists the five Zonai abilities, none implemented', () => {
+  it('lists the five Zonai abilities in menu order', () => {
     expect(ZONAI_ABILITIES.map((a) => a.id)).toEqual(['ultrahand', 'fuse', 'ascend', 'recall', 'autobuild']);
     for (const ability of ZONAI_ABILITIES) {
-      expect(ability.implemented).toBe(false);
       expect(typeof ability.name).toBe('string');
       expect(typeof ability.key).toBe('string');
       expect(typeof ability.description).toBe('string');
+      expect(typeof ability.implemented).toBe('boolean');
     }
+  });
+
+  it('marks Ultrahand, Fuse, Ascend and Recall implemented on the F key', () => {
+    const implemented = ZONAI_ABILITIES.filter((a) => a.implemented);
+    expect(implemented.map((a) => a.id)).toEqual(['ultrahand', 'fuse', 'ascend', 'recall']);
+    for (const ability of implemented) expect(ability.key).toBe('F');
+  });
+
+  it('keeps Autobuild unimplemented with no key', () => {
+    const autobuild = ZONAI_ABILITIES.find((a) => a.id === 'autobuild');
+    expect(autobuild).toMatchObject({ implemented: false, key: '—' });
   });
 
   it('is frozen', () => {

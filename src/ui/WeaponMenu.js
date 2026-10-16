@@ -153,7 +153,7 @@ function buildDetails(item) {
 }
 
 /**
- * Greyed-out row of Zonai abilities that are not implemented yet.
+ * Zonai row: implemented abilities show their key; the rest are greyed out as "coming soon".
  * @returns {HTMLDivElement}
  */
 function buildZonaiRow() {
@@ -161,10 +161,16 @@ function buildZonaiRow() {
   row.appendChild(createElement('span', 'zonai-label', 'Zonai abilities'));
   const list = createElement('ul', 'zonai-list');
   for (const ability of ZONAI_ABILITIES) {
-    const li = createElement('li', 'is-locked');
-    li.setAttribute('aria-disabled', 'true');
+    const li = createElement('li', ability.implemented ? null : 'is-locked');
     li.appendChild(createElement('span', 'zonai-name', ability.name));
-    li.appendChild(createElement('span', 'zonai-status', 'coming soon'));
+    const status = createElement('span', 'zonai-status');
+    if (ability.implemented) {
+      status.appendChild(createElement('kbd', null, ability.key));
+    } else {
+      li.setAttribute('aria-disabled', 'true');
+      status.textContent = 'coming soon';
+    }
+    li.appendChild(status);
     list.appendChild(li);
   }
   row.appendChild(list);
