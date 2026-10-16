@@ -70,7 +70,14 @@ export class Input {
       this._cycleDelta += Math.sign(e.deltaY);
     };
     this._onContextMenu = (e) => e.preventDefault();
-    this._onClick = () => this.domElement.requestPointerLock?.();
+    this._onClick = () => {
+      // Modern browsers return a promise that rejects when the lock is refused (iframes, headless
+      // runs, user gesture rules). Report it instead of leaving an unhandled rejection.
+      const result = this.domElement.requestPointerLock?.();
+      if (result && typeof result.catch === 'function') {
+        result.catch((error) => console.warn('Pointer lock refused:', error?.message ?? error));
+      }
+    };
     this._onPointerLockChange = () => {
       this._pointerLocked = document.pointerLockElement === this.domElement;
       // Losing the lock (Escape, alt-tab) means key-up events may never arrive: drop held keys.

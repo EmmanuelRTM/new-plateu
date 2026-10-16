@@ -418,4 +418,20 @@ describe('Input', () => {
       expect(ev.defaultPrevented).toBe(true);
     });
   });
+
+  describe('pointer lock request', () => {
+    it('requests the lock on click and reports a refused request as a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      canvas.requestPointerLock = vi.fn(() => Promise.reject(new Error('not allowed')));
+      canvas.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(canvas.requestPointerLock).toHaveBeenCalledTimes(1);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(warn).toHaveBeenCalledWith('Pointer lock refused:', 'not allowed');
+    });
+
+    it('tolerates a requestPointerLock that returns nothing', () => {
+      canvas.requestPointerLock = vi.fn(() => undefined);
+      expect(() => canvas.dispatchEvent(new MouseEvent('click', { bubbles: true }))).not.toThrow();
+    });
+  });
 });
