@@ -1,0 +1,73 @@
+/* Map UI: circular minimap (bottom-right) and full-screen world map overlay.
+   Colours and fonts come from the tokens in base.css. */
+
+.minimap {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(244, 239, 228, 0.55);
+  box-shadow: 0 0 6px var(--hud-shadow);
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.minimap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.minimap-north {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--hud-fg);
+  text-shadow: 0 1px 2px var(--hud-shadow);
+  pointer-events: none;
+}
+
+.world-map {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(8, 10, 20, 0.85);
+  color: var(--hud-fg);
+  font-family: var(--font-ui);
+  pointer-events: none;
+}
+
+.world-map[hidden] {
+  display: none;
+}
+
+.world-map-title {
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 3px var(--hud-shadow);
+}
+
+.world-map-canvas {
+  display: block;
+  width: 80vmin;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(244, 239, 228, 0.4);
+  box-shadow: 0 0 12px var(--hud-shadow);
+}
+
+.world-map-footer {
+  font-size: 14px;
+  opacity: 0.75;
+}

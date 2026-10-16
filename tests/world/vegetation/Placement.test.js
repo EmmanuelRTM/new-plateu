@@ -212,3 +212,33 @@ describe('excludeDiscs', () => {
     expect(excludeDiscs([], () => false)(1, 1, 1, 1)).toBe(false);
   });
 });
+
+describe('scatterPoints origin option', () => {
+  it('scatters over [originX, originX + size) × [originZ, originZ + size) when an origin is given', () => {
+    const points = scatterPoints({
+      count: 200,
+      size: 256,
+      originX: 512,
+      originZ: -256,
+      prng: stubPrng(17),
+      heightAt: flatHeight,
+      slopeAt: flatSlope,
+    });
+    expect(points.length).toBe(200);
+    for (const p of points) {
+      expect(p.x).toBeGreaterThanOrEqual(512);
+      expect(p.x).toBeLessThan(768);
+      expect(p.z).toBeGreaterThanOrEqual(-256);
+      expect(p.z).toBeLessThan(0);
+    }
+  });
+
+  it('keeps the centred default when no origin is given', () => {
+    const a = scatterPoints({ count: 20, size: 100, prng: stubPrng(4), heightAt: flatHeight, slopeAt: flatSlope });
+    const b = scatterPoints({ count: 20, size: 100, originX: -50, originZ: -50, prng: stubPrng(4), heightAt: flatHeight, slopeAt: flatSlope });
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i].x).toBeCloseTo(a[i].x, 9);
+      expect(b[i].z).toBeCloseTo(a[i].z, 9);
+    }
+  });
+});

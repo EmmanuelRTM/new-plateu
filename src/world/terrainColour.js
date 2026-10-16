@@ -6,7 +6,7 @@ import { smoothstep } from './noise.js';
 
 /** @type {{grass: number[], rock: number[], sand: number[]}} */
 export const DEFAULT_PALETTE = Object.freeze({
-  grass: [0.08, 0.2, 0.05],
+  grass: [0.11, 0.27, 0.07],
   rock: [0.36, 0.35, 0.33],
   sand: [0.66, 0.6, 0.38],
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createHeightField } from '../../src/world/HeightField.js';
+import { createHeightField, createOffsetHeightField } from '../../src/world/HeightField.js';
 
 const SIZE = 64;
 const RES = 16;
@@ -71,5 +71,29 @@ describe('createHeightField', () => {
     expect(n.y).toBeCloseTo(1 / len, 5);
     expect(n.z).toBeCloseTo(0, 5);
     expect(hf.slopeAt(0, 0)).toBeCloseTo(Math.atan(0.5), 4);
+  });
+});
+
+describe('createOffsetHeightField extras', () => {
+  const offset = { originX: 128, originZ: -64, size: 32, resolution: 8 };
+
+  it('accepts pre-sampled data and then equals the sampled field', () => {
+    const sampled = createOffsetHeightField({ ...offset, heightFn: linear });
+    const fromData = createOffsetHeightField({ ...offset, data: sampled.data });
+    expect(fromData.data).toBe(sampled.data);
+    expect(fromData.heightAt(140, -50)).toBeCloseTo(sampled.heightAt(140, -50), 6);
+  });
+
+  it('rejects pre-sampled data of the wrong length', () => {
+    expect(() => createOffsetHeightField({ ...offset, data: new Float32Array(10) })).toThrow(/length/);
+  });
+
+  it('reports the minimum and maximum sample', () => {
+    const f = createOffsetHeightField({ ...offset, heightFn: linear });
+    expect(f.minHeight).toBeCloseTo(linear(128, -64), 4);
+    expect(f.maxHeight).toBeCloseTo(linear(160, -32), 4);
+    const flatField = createHeightField({ size: SIZE, resolution: RES, heightFn: flat });
+    expect(flatField.minHeight).toBe(5);
+    expect(flatField.maxHeight).toBe(5);
   });
 });

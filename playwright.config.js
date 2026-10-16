@@ -6,7 +6,8 @@ export default defineConfig({
   timeout: 60_000,
   retries: 0,
   workers: 1, // headless WebGL renders at a few fps; run specs one at a time
-  use: { baseURL: 'http://127.0.0.1:5173', headless: true },
+  // Headless Chromium rasterises in software, so a small viewport keeps the frame rate usable.
+  use: { baseURL: 'http://127.0.0.1:5173', headless: true, viewport: { width: 800, height: 450 } },
   webServer: {
     command: 'npm run dev',
     url: 'http://127.0.0.1:5173',

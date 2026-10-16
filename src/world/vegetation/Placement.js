@@ -26,24 +26,29 @@ const TWO_PI = Math.PI * 2;
  */
 
 /**
- * Scatters up to `count` points over a square of side `size` centred on the origin.
- * Candidates are drawn uniformly; at most `count * 8` are tried so the call always terminates.
+ * Scatters up to `count` points over a square of side `size`. By default the square is centred on
+ * the origin; `originX`/`originZ` move its minimum corner. Candidates are drawn uniformly; at most
+ * `count * 8` are tried so the call always terminates.
  * @param {object} options
  * @param {number} options.count Maximum number of points to return.
  * @param {number} options.size Side length of the square, in metres.
+ * @param {number} [options.originX=-size/2] Minimum x of the square.
+ * @param {number} [options.originZ=-size/2] Minimum z of the square.
  * @param {PrngLike} options.prng Deterministic random source.
  * @param {(x: number, z: number) => number} options.heightAt Terrain height sampler.
  * @param {(x: number, z: number) => number} options.slopeAt Terrain slope sampler, in radians.
  * @param {ValidPredicate} [options.isValid] Acceptance test; defaults to accepting everything.
  * @returns {ScatterPoint[]} Accepted points, in generation order.
  */
-export function scatterPoints({ count, size, prng, heightAt, slopeAt, isValid = () => true }) {
+export function scatterPoints({
+  count, size, originX = -size / 2, originZ = -size / 2, prng, heightAt, slopeAt, isValid = () => true,
+}) {
   const points = [];
   if (count <= 0) return points;
   const maxCandidates = count * 8;
   for (let i = 0; i < maxCandidates && points.length < count; i++) {
-    const x = (prng.next() - 0.5) * size;
-    const z = (prng.next() - 0.5) * size;
+    const x = originX + prng.next() * size;
+    const z = originZ + prng.next() * size;
     const y = heightAt(x, z);
     const slope = slopeAt(x, z);
     if (!isValid(x, y, z, slope)) continue;

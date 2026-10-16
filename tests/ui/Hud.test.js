@@ -57,3 +57,32 @@ describe('Hud', () => {
     expect(parent.querySelector('.location-banner').textContent).toBe('Great Plateau');
   });
 });
+
+describe('Hud with maps', () => {
+  it('builds a minimap and a hidden world map from one shared terrain canvas and toggles the map', async () => {
+    const { stubCanvasContext } = await import('./map/fakeCanvas2d.js');
+    const stub = stubCanvasContext();
+    try {
+      const parent = document.createElement('div');
+      let calls = 0;
+      const hud = new Hud(parent, {
+        map: { worldSize: 1024, heightAt: () => { calls += 1; return 30; }, seaLevel: 10, markers: [] },
+      });
+      expect(parent.querySelector('.minimap')).not.toBeNull();
+      expect(parent.querySelector('.world-map').hidden).toBe(true);
+      expect(calls).toBeLessThanOrEqual(1024 * 1024 * 2); // painted once, not twice
+      expect(hud.toggleMap()).toBe(true);
+      expect(parent.querySelector('.world-map').hidden).toBe(false);
+      expect(hud.toggleMap()).toBe(false);
+      hud.update({ player: { x: 1, z: 2, yaw: 0 } });
+      expect(stub.ctx.drawImage).toHaveBeenCalled();
+    } finally {
+      stub.restore();
+    }
+  });
+
+  it('toggleMap is a no-op without map options', () => {
+    const hud = new Hud(document.createElement('div'));
+    expect(hud.toggleMap()).toBe(false);
+  });
+});

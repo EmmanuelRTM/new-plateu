@@ -47,6 +47,14 @@ export class Player {
   }
 
   /**
+   * Shoulder pivots of the placeholder mesh, for attaching held items.
+   * @returns {{ left: import('three').Group, right: import('three').Group }}
+   */
+  get armPivots() {
+    return this.#mesh.armPivots;
+  }
+
+  /**
    * Current physics state (live reference; mutated by update).
    * @returns {import('./PlayerPhysics.js').PlayerState}
    */

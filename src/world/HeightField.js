@@ -1,45 +1,66 @@
+import { sampleChunkGrid } from './partition/sampleChunk.js';
+
 /**
  * Sampled height grid with bilinear lookup, normals and slope. Pure module (no Three.js).
  */
 
 /**
  * @typedef {object} HeightField
- * @property {number} size Side length in metres, centred on the origin.
+ * @property {number} size Side length in metres.
  * @property {number} resolution Cells per side; grid has (resolution+1)^2 samples.
- * @property {Float32Array} data Row-major samples: index = j*(resolution+1)+i, x = -half+i*step, z = -half+j*step.
- * @property {(x: number, z: number) => number} heightAt Bilinear height; clamps outside bounds.
+ * @property {number} originX World x of the minimum-corner sample (grid column 0).
+ * @property {number} originZ World z of the minimum-corner sample (grid row 0).
+ * @property {Float32Array} data Row-major samples: index = j*(resolution+1)+i, x = originX+i*step, z = originZ+j*step.
+ * @property {number} minHeight Lowest sample.
+ * @property {number} maxHeight Highest sample.
+ * @property {(x: number, z: number) => number} heightAt Bilinear height at world (x, z); clamps outside bounds.
  * @property {(x: number, z: number) => {x:number,y:number,z:number}} normalAt Unit normal from central differences.
  * @property {(x: number, z: number) => number} slopeAt Slope angle in radians (acos of normal.y).
  */
 
 /**
- * Samples heightFn on a (resolution+1)² grid and returns lookup helpers.
- * @param {{ size: number, resolution: number, heightFn: (x: number, z: number) => number }} opts
+ * Samples heightFn on a (resolution+1)² grid whose minimum corner is (originX, originZ), and returns
+ * lookup helpers that take world coordinates. Adjacent fields built from the same heightFn share
+ * their edge samples exactly, so tiles built this way join without seams.
+ * Pass `data` (pre-sampled by sampleChunkGrid, e.g. in a worker) to skip sampling; heightFn is then
+ * not needed.
+ * @param {{ originX: number, originZ: number, size: number, resolution: number,
+ *   heightFn?: (x: number, z: number) => number, data?: Float32Array }} opts
  * @returns {HeightField}
+ * @throws {Error} When `data` is given with the wrong length, or when neither data nor heightFn is given.
  */
-export function createHeightField({ size, resolution, heightFn }) {
+export function createOffsetHeightField({ originX, originZ, size, resolution, heightFn, data: presampled }) {
   const n = resolution + 1;
-  const half = size / 2;
   const step = size / resolution;
-  const data = new Float32Array(n * n);
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      data[j * n + i] = heightFn(-half + i * step, -half + j * step);
+  let data = presampled;
+  if (data) {
+    if (data.length !== n * n) {
+      throw new Error(`createOffsetHeightField: data length ${data.length} does not match (${n})^2`);
     }
+  } else {
+    if (!heightFn) throw new Error('createOffsetHeightField: needs either heightFn or data');
+    data = sampleChunkGrid({ originX, originZ, size, resolution, heightFn });
+  }
+  let minHeight = Infinity;
+  let maxHeight = -Infinity;
+  for (const h of data) {
+    if (h < minHeight) minHeight = h;
+    if (h > maxHeight) maxHeight = h;
   }
 
   const clampIdx = (v) => Math.min(resolution, Math.max(0, v));
   const at = (i, j) => data[j * n + i];
-  const toGrid = (v) => (Math.min(half, Math.max(-half, v)) + half) / step;
+  const toGridX = (v) => (Math.min(originX + size, Math.max(originX, v)) - originX) / step;
+  const toGridZ = (v) => (Math.min(originZ + size, Math.max(originZ, v)) - originZ) / step;
 
   /**
-   * @param {number} x
-   * @param {number} z
+   * @param {number} x World x.
+   * @param {number} z World z.
    * @returns {number}
    */
   function heightAt(x, z) {
-    const gx = toGrid(x);
-    const gz = toGrid(z);
+    const gx = toGridX(x);
+    const gz = toGridZ(z);
     const i0 = clampIdx(Math.floor(gx));
     const j0 = clampIdx(Math.floor(gz));
     const i1 = clampIdx(i0 + 1);
@@ -52,13 +73,13 @@ export function createHeightField({ size, resolution, heightFn }) {
   }
 
   /**
-   * @param {number} x
-   * @param {number} z
+   * @param {number} x World x.
+   * @param {number} z World z.
    * @returns {{x:number,y:number,z:number}}
    */
   function normalAt(x, z) {
-    const i = clampIdx(Math.round(toGrid(x)));
-    const j = clampIdx(Math.round(toGrid(z)));
+    const i = clampIdx(Math.round(toGridX(x)));
+    const j = clampIdx(Math.round(toGridZ(z)));
     const il = Math.max(i - 1, 0);
     const ir = Math.min(i + 1, resolution);
     const jd = Math.max(j - 1, 0);
@@ -70,13 +91,22 @@ export function createHeightField({ size, resolution, heightFn }) {
   }
 
   /**
-   * @param {number} x
-   * @param {number} z
+   * @param {number} x World x.
+   * @param {number} z World z.
    * @returns {number} Radians in [0, π/2].
    */
   function slopeAt(x, z) {
     return Math.acos(Math.min(1, Math.max(-1, normalAt(x, z).y)));
   }
 
-  return { size, resolution, data, heightAt, normalAt, slopeAt };
+  return { size, resolution, originX, originZ, data, minHeight, maxHeight, heightAt, normalAt, slopeAt };
+}
+
+/**
+ * Samples heightFn on a centred (resolution+1)² grid and returns lookup helpers.
+ * @param {{ size: number, resolution: number, heightFn: (x: number, z: number) => number }} opts
+ * @returns {HeightField}
+ */
+export function createHeightField({ size, resolution, heightFn }) {
+  return createOffsetHeightField({ originX: -size / 2, originZ: -size / 2, size, resolution, heightFn });
 }

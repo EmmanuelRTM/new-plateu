@@ -1,0 +1,48 @@
+/* Boss health bar: top centre, name above a wide track. Colours come from the tokens in base.css. */
+
+.boss-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 60vw);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  pointer-events: none;
+  font-family: var(--font-ui);
+  color: var(--hud-fg);
+  text-shadow: 0 1px 2px var(--hud-shadow);
+}
+
+.boss-bar[hidden] {
+  display: none !important;
+}
+
+.boss-bar-name {
+  text-align: center;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.boss-bar-track {
+  height: 12px;
+  border: 2px solid var(--hud-fg);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  box-shadow: 0 1px 3px var(--hud-shadow);
+}
+
+.boss-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--boss-fill, #d9c27a);
+  transition: width 0.18s ease-out;
+}
+
+.boss-bar-fill.is-low {
+  background: var(--heart, #e04b4b);
+}

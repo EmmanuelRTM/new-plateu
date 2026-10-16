@@ -52,6 +52,15 @@ describe('Input', () => {
         mouseDX: 0,
         mouseDY: 0,
         pointerLocked: false,
+        attackPressed: false,
+        blockHeld: false,
+        menuPressed: false,
+        mapPressed: false,
+        cycleDelta: 0,
+        slotPressed: 0,
+        abilityPressed: false,
+        abilityCyclePressed: false,
+        cancelPressed: false,
       });
     });
 
@@ -309,6 +318,120 @@ describe('Input', () => {
       setPointerLockElement(canvas);
       mouseMove(4, 0);
       expect(input.snapshot().mouseDX).toBe(4);
+    });
+  });
+
+  describe('combat, menu and map controls', () => {
+    function mouse(type, button) {
+      document.dispatchEvent(new MouseEvent(type, { button, bubbles: true }));
+    }
+
+    it('Tab sets menuPressed once and is prevented from moving focus', () => {
+      const ev = key('keydown', 'Tab');
+      expect(ev.defaultPrevented).toBe(true);
+      expect(input.snapshot().menuPressed).toBe(true);
+      expect(input.snapshot().menuPressed).toBe(false);
+      key('keyup', 'Tab');
+    });
+
+    it('M sets mapPressed for one snapshot', () => {
+      key('keydown', 'KeyM');
+      expect(input.snapshot().mapPressed).toBe(true);
+      expect(input.snapshot().mapPressed).toBe(false);
+      key('keyup', 'KeyM');
+    });
+
+    it('digits 1-9 set slotPressed to the slot number and reset after snapshot', () => {
+      key('keydown', 'Digit3');
+      expect(input.snapshot().slotPressed).toBe(3);
+      expect(input.snapshot().slotPressed).toBe(0);
+      key('keyup', 'Digit3');
+      key('keydown', 'Digit9');
+      expect(input.snapshot().slotPressed).toBe(9);
+      key('keyup', 'Digit9');
+      key('keydown', 'Digit0');
+      expect(input.snapshot().slotPressed).toBe(0);
+      key('keyup', 'Digit0');
+    });
+
+    it('Q and R accumulate cycleDelta (-1 / +1) until the snapshot', () => {
+      key('keydown', 'KeyR');
+      key('keyup', 'KeyR');
+      key('keydown', 'KeyR');
+      key('keyup', 'KeyR');
+      key('keydown', 'KeyQ');
+      key('keyup', 'KeyQ');
+      expect(input.snapshot().cycleDelta).toBe(1);
+      expect(input.snapshot().cycleDelta).toBe(0);
+    });
+
+    it('mouse wheel cycles only while the pointer is locked', () => {
+      document.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }));
+      expect(input.snapshot().cycleDelta).toBe(0);
+      setPointerLockElement(canvas);
+      document.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, bubbles: true }));
+      expect(input.snapshot().cycleDelta).toBe(-1);
+    });
+
+    it('left mouse button sets attackPressed only while locked; right button holds blockHeld', () => {
+      mouse('mousedown', 0);
+      expect(input.snapshot().attackPressed).toBe(false);
+      setPointerLockElement(canvas);
+      mouse('mousedown', 0);
+      expect(input.snapshot().attackPressed).toBe(true);
+      expect(input.snapshot().attackPressed).toBe(false);
+      mouse('mousedown', 2);
+      expect(input.snapshot().blockHeld).toBe(true);
+      expect(input.snapshot().blockHeld).toBe(true);
+      mouse('mouseup', 2);
+      expect(input.snapshot().blockHeld).toBe(false);
+    });
+
+    it('losing pointer lock releases the guard button', () => {
+      setPointerLockElement(canvas);
+      mouse('mousedown', 2);
+      expect(input.snapshot().blockHeld).toBe(true);
+      setPointerLockElement(null);
+      expect(input.snapshot().blockHeld).toBe(false);
+    });
+
+    it('F, Z and X set the ability edge flags for one snapshot each', () => {
+      key('keydown', 'KeyF');
+      key('keydown', 'KeyZ');
+      key('keydown', 'KeyX');
+      const s = input.snapshot();
+      expect(s.abilityPressed).toBe(true);
+      expect(s.abilityCyclePressed).toBe(true);
+      expect(s.cancelPressed).toBe(true);
+      const next = input.snapshot();
+      expect(next.abilityPressed).toBe(false);
+      expect(next.abilityCyclePressed).toBe(false);
+      expect(next.cancelPressed).toBe(false);
+      key('keyup', 'KeyF');
+      key('keyup', 'KeyZ');
+      key('keyup', 'KeyX');
+    });
+
+    it('suppresses the context menu on the bound element', () => {
+      const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+      canvas.dispatchEvent(ev);
+      expect(ev.defaultPrevented).toBe(true);
+    });
+  });
+
+  describe('pointer lock request', () => {
+    it('requests the lock on click and reports a refused request as a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      canvas.requestPointerLock = vi.fn(() => Promise.reject(new Error('not allowed')));
+      canvas.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(canvas.requestPointerLock).toHaveBeenCalledTimes(1);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(warn).toHaveBeenCalledWith('Pointer lock refused:', 'not allowed');
+    });
+
+    it('tolerates a requestPointerLock that returns nothing', () => {
+      canvas.requestPointerLock = vi.fn(() => undefined);
+      expect(() => canvas.dispatchEvent(new MouseEvent('click', { bubbles: true }))).not.toThrow();
     });
   });
 });
