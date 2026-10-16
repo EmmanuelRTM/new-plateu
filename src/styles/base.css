@@ -1,0 +1,13 @@
+/* Base layout. Feature-specific styles live next to their UI module (src/styles/<feature>.css). */
+:root {
+  --hud-fg: #f4efe4;
+  --hud-shadow: rgba(0, 0, 0, 0.6);
+  --stamina-fill: #8fe36b;
+  --stamina-low: #e36b6b;
+  --heart: #e04b4b;
+  --font-ui: "Georgia", "Times New Roman", serif;
+}
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+#app, #app canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#hud { position: fixed; inset: 0; pointer-events: none; color: var(--hud-fg); font-family: var(--font-ui); }
+#overlay { position: fixed; inset: 0; pointer-events: none; }
