@@ -58,6 +58,9 @@ describe('Input', () => {
         mapPressed: false,
         cycleDelta: 0,
         slotPressed: 0,
+        abilityPressed: false,
+        abilityCyclePressed: false,
+        cancelPressed: false,
       });
     });
 
@@ -390,6 +393,23 @@ describe('Input', () => {
       expect(input.snapshot().blockHeld).toBe(true);
       setPointerLockElement(null);
       expect(input.snapshot().blockHeld).toBe(false);
+    });
+
+    it('F, Z and X set the ability edge flags for one snapshot each', () => {
+      key('keydown', 'KeyF');
+      key('keydown', 'KeyZ');
+      key('keydown', 'KeyX');
+      const s = input.snapshot();
+      expect(s.abilityPressed).toBe(true);
+      expect(s.abilityCyclePressed).toBe(true);
+      expect(s.cancelPressed).toBe(true);
+      const next = input.snapshot();
+      expect(next.abilityPressed).toBe(false);
+      expect(next.abilityCyclePressed).toBe(false);
+      expect(next.cancelPressed).toBe(false);
+      key('keyup', 'KeyF');
+      key('keyup', 'KeyZ');
+      key('keyup', 'KeyX');
     });
 
     it('suppresses the context menu on the bound element', () => {

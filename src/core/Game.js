@@ -42,6 +42,7 @@ const IDLE_INPUT = Object.freeze({
   moveX: 0, moveZ: 0, sprint: false, jumpHeld: false, jumpPressed: false, interactPressed: false,
   anyKeyPressed: false, mouseDX: 0, mouseDY: 0, pointerLocked: true, attackPressed: false,
   blockHeld: false, menuPressed: false, mapPressed: false, cycleDelta: 0, slotPressed: 0,
+  abilityPressed: false, abilityCyclePressed: false, cancelPressed: false,
 });
 
 /**

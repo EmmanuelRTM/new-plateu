@@ -7,7 +7,8 @@
 /** @typedef {{ moveX:number, moveZ:number, sprint:boolean, jumpHeld:boolean, jumpPressed:boolean,
  *   interactPressed:boolean, anyKeyPressed:boolean, mouseDX:number, mouseDY:number, pointerLocked:boolean,
  *   attackPressed:boolean, blockHeld:boolean, menuPressed:boolean, mapPressed:boolean,
- *   cycleDelta:number, slotPressed:number }} InputState */
+ *   cycleDelta:number, slotPressed:number, abilityPressed:boolean, abilityCyclePressed:boolean,
+ *   cancelPressed:boolean }} InputState */
 
 /** Keys whose default browser action (page scrolling, focus change) is suppressed. */
 const PREVENT_DEFAULT_CODES = new Set([
@@ -25,7 +26,7 @@ const MOUSE_RIGHT = 2;
  * frame. Edge flags (`jumpPressed`, `interactPressed`, `anyKeyPressed`, `attackPressed`,
  * `menuPressed`, `mapPressed`, `slotPressed`), `cycleDelta` and mouse deltas are cleared by each
  * `snapshot()`. Keys: Tab → menu, M → map, Q/R or wheel → cycle weapon, 1–9 → slot,
- * LMB → attack, RMB (held) → guard.
+ * LMB → attack, RMB (held) → guard, F → use ability, Z → next ability, X → cancel ability.
  */
 export class Input {
   /**
@@ -44,6 +45,9 @@ export class Input {
     this._mapPressed = false;
     this._cycleDelta = 0;
     this._slotPressed = 0;
+    this._abilityPressed = false;
+    this._abilityCyclePressed = false;
+    this._cancelPressed = false;
     this._blockHeld = false;
     this._mouseDX = 0;
     this._mouseDY = 0;
@@ -148,6 +152,9 @@ export class Input {
       mapPressed: this._mapPressed,
       cycleDelta: this._cycleDelta,
       slotPressed: this._slotPressed,
+      abilityPressed: this._abilityPressed,
+      abilityCyclePressed: this._abilityCyclePressed,
+      cancelPressed: this._cancelPressed,
     };
     this._jumpPressed = false;
     this._interactPressed = false;
@@ -157,6 +164,9 @@ export class Input {
     this._mapPressed = false;
     this._cycleDelta = 0;
     this._slotPressed = 0;
+    this._abilityPressed = false;
+    this._abilityCyclePressed = false;
+    this._cancelPressed = false;
     this._mouseDX = 0;
     this._mouseDY = 0;
     return state;
@@ -177,6 +187,9 @@ export class Input {
     if (e.code === 'KeyM') this._mapPressed = true;
     if (e.code === 'KeyQ') this._cycleDelta -= 1;
     if (e.code === 'KeyR') this._cycleDelta += 1;
+    if (e.code === 'KeyF') this._abilityPressed = true;
+    if (e.code === 'KeyZ') this._abilityCyclePressed = true;
+    if (e.code === 'KeyX') this._cancelPressed = true;
     const slot = SLOT_CODES.get(e.code);
     if (slot) this._slotPressed = slot;
   }
