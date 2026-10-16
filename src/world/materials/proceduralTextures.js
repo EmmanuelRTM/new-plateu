@@ -10,11 +10,15 @@ import {
   ridgedNoiseArray,
 } from './textureNoise.js';
 
+/**
+ * Near-neutral luminance palette: the terrain's hypsometric vertex colours (grass, rock, sand)
+ * supply the hue, so this detail map only mottles brightness and must not tint rock green.
+ */
 const GRASS_PALETTE = [
-  { t: 0, rgb: [58, 92, 38] },
-  { t: 0.5, rgb: [98, 136, 58] },
-  { t: 0.8, rgb: [142, 160, 74] },
-  { t: 1, rgb: [124, 110, 64] },
+  { t: 0, rgb: [150, 156, 140] },
+  { t: 0.5, rgb: [205, 210, 192] },
+  { t: 0.8, rgb: [240, 242, 226] },
+  { t: 1, rgb: [222, 214, 190] },
 ];
 
 const ROCK_PALETTE = [

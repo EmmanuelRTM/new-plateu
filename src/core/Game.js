@@ -246,6 +246,7 @@ export class Game {
     this.#sky.update(this.#cycle, dt);
     this.#lighting.update(this.#cycle, position);
     this.#world.water.userData.update?.(dt);
+    this.#world.terrain.userData.update?.(position);
     this.#stars.object.position.copy(this.#camera.position);
     this.#stars.update(this.#cycle);
     tickWind(dt);

@@ -24,10 +24,8 @@ function resolvePalette(colours = {}) {
  * Builds a terrain mesh from a sampled height field. The PlaneGeometry grid layout matches the
  * HeightField sample layout (row-major, x fastest), so vertex i takes data[i] as its height.
  * The geometry is centred, so the mesh is moved to (originX + size/2, 0, originZ + size/2); fields
- * without an origin are treated as centred on the world origin.
- * @param {import('./HeightField.js').HeightField} heightField Sampled terrain.
- * UVs are world-space metres divided by `uvMetres`, so a repeating detail texture continues
- * seamlessly across neighbouring chunk meshes.
+ * without an origin are treated as centred on the world origin. UVs are world-space metres divided
+ * by `uvMetres`, so a repeating detail texture continues seamlessly across neighbouring chunk meshes.
  * @param {import('./HeightField.js').HeightField} heightField Sampled terrain.
  * @param {{ colours?: {grass?: number|string, rock?: number|string, sand?: number|string},
  *   originX?: number, originZ?: number, material?: THREE.Material, uvMetres?: number }} [opts]

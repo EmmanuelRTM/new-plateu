@@ -148,7 +148,7 @@ export function createDayNightCycle({ dayLengthSeconds = 600, startHour = 8 } = 
     },
 
     /**
-     * Hemisphere/ambient strength: 0.45 at midnight up to 0.75 at noon.
+     * Hemisphere/ambient strength: 0.6 at midnight up to 0.75 at noon.
      * @returns {number}
      */
     ambientIntensity() {
@@ -185,7 +185,7 @@ export function createDayNightCycle({ dayLengthSeconds = 600, startHour = 8 } = 
     },
 
     /**
-     * Atmospheric turbidity for the Sky shader: about 1.5 at night, 5 at day (deep blue, not hazy).
+     * Atmospheric turbidity for the Sky shader: about 1.5 at night, 3 at day (deep blue, not hazy).
      * @returns {number}
      */
     skyTurbidity() {

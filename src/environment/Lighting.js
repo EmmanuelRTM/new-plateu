@@ -4,11 +4,11 @@ import * as THREE from 'three';
 const SHADOW_HALF_EXTENT = 80;
 /** Distance (metres) from the followed point to the sun's and moon's positions. */
 const SUN_DISTANCE = 200;
-/** Peak directional strengths. Sun 2.2 keeps daylight from washing out with exposure 0.55. */
+/** Peak directional strengths. Sun 2.2 keeps daylight from washing out with exposure 0.65. */
 const SUN_PEAK_INTENSITY = 2.2;
 const MOON_PEAK_INTENSITY = 1.5;
 /**
- * Hemisphere peak: ambient floor 0.45 gives about 0.97 at midnight, ceiling 0.75 gives about 1.6 at noon.
+ * Hemisphere peak: ambient floor 0.6 gives about 1.3 at midnight, ceiling 0.75 gives about 1.6 at noon.
  */
 const HEMI_PEAK_INTENSITY = 2.15;
 /** Fog ranges (metres). Night pushes the fog out so the dark does not swallow mid-distance objects. */

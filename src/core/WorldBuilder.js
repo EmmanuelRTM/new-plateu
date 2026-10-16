@@ -14,6 +14,7 @@ import { createTempleOfTime } from '../world/landmarks/TempleOfTime.js';
 import { createChunkedHeightField } from '../world/partition/ChunkedHeightField.js';
 import { createChunkManager } from '../world/partition/ChunkManager.js';
 import { createTerrainMaterial } from '../world/terrainMaterial.js';
+import { createFarTerrainMaterial } from '../world/farTerrainMaterial.js';
 
 /** Lift (m) added to the spawn height so the feet clear the corridor floor. */
 const SPAWN_LIFT = 0.05;
@@ -46,11 +47,18 @@ export function buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnload
     heightFn,
   });
 
+  const terrainMaterial = createTerrainMaterial({ seed: config.seed, chunkMetres: config.chunk.size });
   const farField = createHeightField({ size: config.size, resolution: config.far.resolution, heightFn });
-  const terrain = createTerrainMesh(farField);
+  // Hidden under the loaded chunk square: loadRadius chunks on each side minus the player's offset
+  // within its own chunk, so the coarse mesh cannot poke through the detailed terrain.
+  const far = createFarTerrainMaterial(terrainMaterial, {
+    hideRadius: config.chunk.loadRadius * config.chunk.size - config.chunk.size * 0.5,
+  });
+  const terrain = createTerrainMesh(farField, { material: far.material, uvMetres: config.chunk.size });
   terrain.name = 'FarTerrain';
   terrain.position.y = config.far.yOffset;
   terrain.receiveShadow = false;
+  terrain.userData.update = far.update;
 
   const water = createWater({ size: config.size, level: config.seaLevel });
 
@@ -76,7 +84,6 @@ export function buildWorld(scene, config = WORLD, { onChunkLoaded, onChunkUnload
 
   scene.add(terrain, water, shrine, temple);
 
-  const terrainMaterial = createTerrainMaterial({ seed: config.seed, chunkMetres: config.chunk.size });
   const chunks = createChunkManager({ scene, config, heightField, onChunkLoaded, onChunkUnloaded, terrainMaterial });
   chunks.update(spawn, { maxLoads: Infinity });
 
