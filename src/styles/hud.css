@@ -1,0 +1,154 @@
+/* HUD: hearts, stamina wheel, location banner and interaction prompt.
+   Colours and fonts come from the tokens in base.css. */
+
+[hidden] { display: none !important; }
+
+.hud-root {
+  --stamina-flash: #f2a33a;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Hearts: top-left row. Outline layer is always drawn; fill layer is clipped for halves. */
+.hearts {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  gap: 6px;
+}
+
+.heart {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 1px 2px var(--hud-shadow));
+}
+
+.heart svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.heart-base {
+  fill: rgba(0, 0, 0, 0.35);
+  stroke: var(--hud-fg);
+  stroke-opacity: 0.6;
+  stroke-width: 1.2;
+}
+
+.heart-fill {
+  fill: var(--heart);
+  transition: opacity 0.3s ease, clip-path 0.3s ease;
+}
+
+.heart.is-empty .heart-fill { opacity: 0; }
+.heart.is-full .heart-fill { opacity: 1; }
+.heart.is-half .heart-fill {
+  opacity: 1;
+  clip-path: inset(0 50% 0 0);
+}
+
+/* Stamina wheel: centre-right, slightly below middle. */
+.stamina-wheel {
+  position: absolute;
+  left: 58%;
+  top: 56%;
+  width: 64px;
+  height: 64px;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+  transition: opacity 0.8s ease;
+  filter: drop-shadow(0 0 3px var(--hud-shadow));
+}
+
+.stamina-wheel svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.stamina-wheel circle {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: butt;
+}
+
+.stamina-track {
+  stroke: var(--hud-fg);
+  stroke-opacity: 0.22;
+}
+
+.stamina-fill {
+  stroke: var(--stamina-fill);
+  transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
+}
+
+.stamina-wheel.is-full { opacity: 0; }
+
+.stamina-wheel.is-exhausted .stamina-fill {
+  animation: stamina-flash 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes stamina-flash {
+  from { stroke: var(--stamina-low); }
+  to { stroke: var(--stamina-flash); }
+}
+
+/* Location banner: large serif, lower third, thin rules above and below. */
+.location-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 24%;
+  padding: 18px 0;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: clamp(26px, 4vw, 44px);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  color: var(--hud-fg);
+  text-shadow: 0 2px 10px var(--hud-shadow);
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+.location-banner.is-visible { opacity: 1; }
+
+.location-banner::before,
+.location-banner::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: min(360px, 70vw);
+  height: 1px;
+  transform: translateX(-50%);
+  background: var(--hud-fg);
+  opacity: 0.7;
+}
+
+.location-banner::before { top: 0; }
+.location-banner::after { bottom: 0; }
+
+/* Interaction prompt: pill near the bottom centre. */
+.hud-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border: 1px solid rgba(244, 239, 228, 0.4);
+  border-radius: 999px;
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: var(--hud-fg);
+  text-shadow: 0 1px 6px var(--hud-shadow);
+}

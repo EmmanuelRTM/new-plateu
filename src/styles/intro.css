@@ -1,0 +1,68 @@
+/* Intro overlay: black screen, title, "Open your eyes" line and a pulsing prompt.
+   Colours and fonts come from the tokens in base.css. */
+
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: #000;
+  color: var(--hud-fg);
+  font-family: var(--font-ui);
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity 1.5s ease;
+}
+
+.intro-overlay.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.intro-title {
+  margin: 0;
+  font-weight: 400;
+  font-variant: small-caps;
+  font-size: clamp(30px, 6vw, 56px);
+  letter-spacing: 0.22em;
+  text-shadow: 0 0 18px rgba(244, 239, 228, 0.25);
+  animation: intro-fade 2.2s ease both;
+}
+
+.intro-line {
+  margin: 0;
+  font-style: italic;
+  font-size: clamp(18px, 2.6vw, 24px);
+  letter-spacing: 0.06em;
+  opacity: 0;
+  animation: intro-fade 2.5s ease 2.8s forwards;
+}
+
+.intro-prompt {
+  margin: 2.5rem 0 0;
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0;
+  animation:
+    intro-fade 1s ease 5.5s forwards,
+    intro-pulse 2.4s ease-in-out 6.5s infinite;
+}
+
+@keyframes intro-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes intro-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}

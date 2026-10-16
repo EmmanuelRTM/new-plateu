@@ -60,7 +60,7 @@ export const WORLD = Object.freeze({
   maxHeight: 140,
   plateauRadius: 420,    // beyond this the ground falls away sharply (cliff rim)
   gravity: 28,           // m/s²
-  spawn: Object.freeze({ x: 0, z: 0, yaw: Math.PI }),   // inside the shrine, facing -z exit... see landmarks
+  spawn: Object.freeze({ x: 0, z: 0, yaw: 0 }),   // inside the shrine, facing the +z exit
   templeOfTime: Object.freeze({ x: -180, z: 140 }),
   shrine: Object.freeze({ x: 0, z: 0, exitDirection: Object.freeze({ x: 0, z: 1 }) }),
 });
@@ -97,8 +97,9 @@ export function hash2D(x, z, seed) // deterministic [0,1) for integer lattice co
 // world/terrainHeight.js
 export function createTerrainHeightFn(config = WORLD) // → (x:number, z:number) => y:number
 // Layered value/simplex noise (own implementation, seeded) ⇒ rolling hills 15–90 m; smooth radial
-// falloff to below seaLevel for r > plateauRadius (cliff rim); flat discs of radius 24 m around
-// WORLD.shrine (y≈60) and WORLD.templeOfTime (y≈75); a basin around (120, -160) that dips below seaLevel (lake).
+// falloff to below seaLevel for r > plateauRadius (cliff rim); flat disc of radius 24 m around
+// WORLD.shrine (y≈60) and radius 34 m around WORLD.templeOfTime (y≈75), each on a broad hill whose skirt
+// blends back to the natural terrain over ~120 m so the approach is a walkable (<25°) grass slope; a basin around (120, -160) that dips below seaLevel (lake).
 
 // world/HeightField.js
 export function createHeightField({ size, resolution, heightFn })
@@ -121,7 +122,7 @@ export function createTrees(points)  // → THREE.Group of InstancedMesh (castSh
 export function createShrineOfResurrection({ position, exitDirection, groundY }) // → THREE.Group. A 6 m wide, 5 m tall,
 // 30 m long stone corridor whose open end faces exitDirection; spawn point is at the closed end. Exposes group.userData.spawn = {x,y,z}.
 // world/landmarks/TempleOfTime.js
-export function createTempleOfTime({ position, groundY })  // → THREE.Group of broken stone walls, columns, a central statue plinth.
+export function createTempleOfTime({ position, groundY })  // → THREE.Group of broken stone walls, columns, a Goddess statue plinth at the far (north) end.
 ```
 
 ## Environment
@@ -131,7 +132,7 @@ export function createDayNightCycle({ dayLengthSeconds = 600, startHour = 8 } = 
 // → { update(dt), hour (0–24, getter), sunDirection()→{x,y,z} unit, sunIntensity()→0..1, ambientIntensity()→0..1,
 //     sunColor()→{r,g,b} 0..1, skyTurbidity()→number, isNight }
 // environment/SkyDome.js
-export function createSkyDome()  // → { object: THREE.Object3D (Sky addon, scale 10000), update(cycle) }
+export function createSkyDome()  // → { object: THREE.Object3D (Sky addon, scale 10000), update(cycle, dt) }  dt drives cloud drift
 // environment/Lighting.js
 export function createLighting(scene, { shadowMapSize = 2048 } = {}) // → { sun: DirectionalLight, hemi: HemisphereLight, update(cycle, followPosition) }
 // update moves sun to follow the player (shadow frustum ≈ 160 m) and tints fog/lights from the cycle.
@@ -141,7 +142,7 @@ export function createLighting(scene, { shadowMapSize = 2048 } = {}) // → { su
 ```js
 // player/Stamina.js (pure)
 export function createStamina({ max = 100, sprintDrain = 15, glideDrain = 12, regenRate = 25, exhaustedRegenRate = 18 } = {})
-// → { value, max, exhausted, drain(amountPerSec, dt)→boolean (false if empty), regen(dt), ratio() }
+// → { value, max, exhausted, drain(amountPerSec, dt)→boolean (false when the drain would go below 0; value is clamped to 0 and exhausted becomes true), regen(dt), ratio() }
 // When value hits 0 ⇒ exhausted=true until value refills to max.
 
 // player/PlayerPhysics.js (pure)
@@ -171,8 +172,8 @@ export class Player {
 ```js
 // camera/ThirdPersonCamera.js
 export class ThirdPersonCamera {
-  constructor(camera, { heightAt, distance = 6, height = 1.8, sensitivity = 0.0025, minPitch = -0.5, maxPitch = 1.2 })
-  get yaw()
+  constructor(camera, { heightAt, distance = 6, height = 1.8, sensitivity = 0.0025, minPitch = -0.5, maxPitch = 1.2, initialYaw = 0 })
+  get yaw()   get pitch()
   update(targetPosition, inputState, dt)   // orbit from mouseDX/DY, smooth follow, keep camera ≥ 0.5 m above terrain
 }
 ```
@@ -199,3 +200,28 @@ Frame dt is clamped to 0.05 s. Resize handled via `window.resize`.
 
 ## Events (EventBus names)
 `player:exitedShrine` (fired once when player leaves the shrine corridor) → Hud shows "Great Plateau".
+
+## Yaw conventions
+Two conventions coexist; the Game bridges them.
+- **Camera** (`ThirdPersonCamera.yaw`): `yaw = 0` looks toward −Z (Three.js default). Forward = `(−sin yaw, −cos yaw)`,
+  right = `(cos yaw, −sin yaw)`. Mouse right decreases yaw. Camera-relative movement in `playerMovement.movementIntent`
+  uses this convention for `cameraYaw`: `dir = forward·moveZ + right·moveX`.
+- **Player facing** (`state.yaw`, `PlayerMesh`): facing = `(sin yaw, cos yaw)`, so `yaw = 0` faces +Z and
+  `object.rotation.y = state.yaw` is correct because the mesh's front is built along local +Z.
+- Bridge: at spawn the Game sets the player's yaw to `atan2(exitDirection.x, exitDirection.z)` (faces the exit) and the
+  camera's `initialYaw` to that value **+ π** so the camera looks the same way.
+- `WORLD.spawn` only records the shrine centre; the actual spawn point is `shrine.userData.spawn` (12 m inside the closed end).
+
+## Events (EventBus names)
+`player:exitedShrine` (fired once when player leaves the shrine corridor) → Hud shows "Great Plateau".
+
+## Yaw convention (camera and player share it)
+`yaw = 0` looks toward −Z (Three.js default). For any yaw:
+```js
+const fx = -Math.sin(yaw), fz = -Math.cos(yaw);   // forward
+const rx =  Math.cos(yaw), rz = -Math.sin(yaw);   // right (forward rotated 90° clockwise seen from above)
+// camera-relative move direction in PlayerPhysics: dir = forward*moveZ + right*moveX  (then normalised)
+```
+The player mesh faces `(−sin(state.yaw), −cos(state.yaw))`, so `object.rotation.y = state.yaw` matches
+Three.js's default −Z facing. Mouse right decreases camera yaw; `ThirdPersonCamera.yaw` is the value to pass
+as `cameraYaw`.
